@@ -40,9 +40,24 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 
 ## 安装
 
+### 方式一：全局安装（推荐）
+
 ```bash
 npm install -g mcp-xxl-job
 ```
+
+安装后直接使用 `mcp-xxl-job` 命令。
+
+### 方式二：通过 npx 直接使用（无需安装）
+
+```bash
+npx mcp-xxl-job
+```
+
+> **注意**：如果你的 npm 配置了国内镜像源（如 npmmirror），npx 可能无法找到包。此时请使用全局安装方式，或指定官方源：
+> ```bash
+> npx --registry=https://registry.npmjs.org mcp-xxl-job
+> ```
 
 ## 配置
 
@@ -59,6 +74,25 @@ npm install -g mcp-xxl-job
 
 在 MCP 客户端（如 Claude Desktop、Cursor、Qoder 等）中添加以下配置：
 
+**方式一：全局安装后使用（推荐）**
+
+```json
+{
+  "mcpServers": {
+    "xxl-job": {
+      "command": "mcp-xxl-job",
+      "env": {
+        "XXL_JOB_URL": "http://127.0.0.1:8080/xxl-job-admin",
+        "XXL_JOB_USERNAME": "admin",
+        "XXL_JOB_PASSWORD": "123456"
+      }
+    }
+  }
+}
+```
+
+**方式二：通过 npx 使用**
+
 ```json
 {
   "mcpServers": {
@@ -74,6 +108,8 @@ npm install -g mcp-xxl-job
   }
 }
 ```
+
+> **提示**：如果 npx 方式连接失败，请改用全局安装方式，或在 args 中添加 `"--registry=https://registry.npmjs.org"`。
 
 ## 使用示例
 
@@ -161,4 +197,4 @@ mcp-xxl-job/
 
 ## 许可证
 
-[MIT](./LICENSE) © 2024
+[MIT](./LICENSE) © 2026
