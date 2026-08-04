@@ -90,7 +90,7 @@ npm install -g mcp-xxl-job
   "mcpServers": {
     "xxl-job": {
       "command": "npx",
-      "args": ["-y", "mcp-xxl-job"],
+      "args": ["-y", "mcp-xxl-job@latest"],
       "env": {
         "XXL_JOB_URL": "http://127.0.0.1:8080/xxl-job-admin",
         "XXL_JOB_USERNAME": "admin",
