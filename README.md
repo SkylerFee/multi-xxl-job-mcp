@@ -38,26 +38,6 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 - **Node.js** >= 18
 - **XXL-JOB Admin** >= 2.3.0
 
-## 安装
-
-### 方式一：全局安装（推荐）
-
-```bash
-npm install -g mcp-xxl-job
-```
-
-安装后直接使用 `mcp-xxl-job` 命令。
-
-### 方式二：通过 npx 直接使用（无需安装）
-
-```bash
-npx mcp-xxl-job
-```
-
-> **注意**：如果你的 npm 配置了国内镜像源（如 npmmirror），npx 可能无法找到包。此时请使用全局安装方式，或指定官方源：
-> ```bash
-> npx --registry=https://registry.npmjs.org mcp-xxl-job
-> ```
 
 ## 配置
 
@@ -76,6 +56,12 @@ npx mcp-xxl-job
 
 **方式一：全局安装后使用（推荐）**
 
+- 安装：
+```bash
+npm install -g mcp-xxl-job
+```
+
+- 配置：
 ```json
 {
   "mcpServers": {
@@ -93,12 +79,18 @@ npx mcp-xxl-job
 
 **方式二：通过 npx 使用**
 
+> **注意**：如果你的 npm 配置了国内镜像源（如 npmmirror），npx 可能无法找到包。此时请使用全局安装方式，或指定官方源：
+> ```bash
+> npx --registry=https://registry.npmjs.org mcp-xxl-job
+> ```
+
+- 配置：
 ```json
 {
   "mcpServers": {
     "xxl-job": {
       "command": "npx",
-      "args": ["mcp-xxl-job"],
+      "args": ["-y", "mcp-xxl-job"],
       "env": {
         "XXL_JOB_URL": "http://127.0.0.1:8080/xxl-job-admin",
         "XXL_JOB_USERNAME": "admin",

@@ -9,6 +9,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
@@ -451,15 +452,21 @@ export async function main(): Promise<void> {
  * 判断当前模块是否作为入口直接运行。
  * 通过 npx / npm 全局安装运行时，process.argv[1] 可能是 node_modules/.bin 下的符号链接，
  * 需用 realpathSync 解析为真实路径后再与 import.meta.url 比较，否则会误判为被导入而静默退出。
+ * Windows 下路径大小写不敏感，统一转小写比较，避免盘符大小写差异导致误判。
  */
 function isMainModule(): boolean {
   const argv1 = process.argv[1];
   if (!argv1) return false;
+  let entryHref: string;
   try {
-    return import.meta.url === pathToFileURL(realpathSync(argv1)).href;
+    entryHref = pathToFileURL(realpathSync(resolve(argv1))).href;
   } catch {
     return false;
   }
+  if (process.platform === "win32") {
+    return entryHref.toLowerCase() === import.meta.url.toLowerCase();
+  }
+  return entryHref === import.meta.url;
 }
 
 // 直接运行时启动 stdio 服务
