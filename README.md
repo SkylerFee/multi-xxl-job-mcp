@@ -61,6 +61,13 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 npm install -g mcp-xxl-job
 ```
 
+> **升级**：全局安装的版本不会自动更新，需手动升级：
+> ```bash
+> npm update -g mcp-xxl-job
+> # 或
+> npm install -g mcp-xxl-job@latest
+> ```
+
 - 配置：
 ```json
 {
@@ -81,8 +88,10 @@ npm install -g mcp-xxl-job
 
 > **注意**：如果你的 npm 配置了国内镜像源（如 npmmirror），npx 可能无法找到包。此时请使用全局安装方式，或指定官方源：
 > ```bash
-> npx --registry=https://registry.npmjs.org mcp-xxl-job
+> npx --registry=https://registry.npmjs.org mcp-xxl-job@latest
 > ```
+>
+> 包名后加 `@latest` 可确保每次启动都获取最新版本（npx 有本地缓存，不加 `@latest` 可能会一直使用缓存的旧版本）。
 
 - 配置：
 ```json
