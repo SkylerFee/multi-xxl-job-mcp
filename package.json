@@ -1,6 +1,6 @@
 {
   "name": "mcp-xxl-job",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP Server for XXL-JOB admin: query/add/update jobs, start/stop, manual trigger and execution log viewing via XXL-JOB admin web API",
   "type": "module",
   "license": "MIT",

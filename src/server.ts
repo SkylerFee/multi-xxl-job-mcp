@@ -8,6 +8,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
@@ -63,7 +64,7 @@ function jobToForm(job: XxlJobInfo): Record<string, string | number> {
 
 /** 构建并注册全部工具的 MCP Server（供启动入口与测试复用） */
 export function buildServer(client: XxlJobClient): McpServer {
-  const server = new McpServer({ name: "mcp-xxl-job", version: "1.0.0" });
+  const server = new McpServer({ name: "mcp-xxl-job", version: "1.0.1" });
 
   // ----------------------------------------------------------------
   // 执行器组
@@ -446,9 +447,23 @@ export async function main(): Promise<void> {
   console.error(`[mcp-xxl-job] 已启动，目标调度中心: ${config.baseUrl}`);
 }
 
+/**
+ * 判断当前模块是否作为入口直接运行。
+ * 通过 npx / npm 全局安装运行时，process.argv[1] 可能是 node_modules/.bin 下的符号链接，
+ * 需用 realpathSync 解析为真实路径后再与 import.meta.url 比较，否则会误判为被导入而静默退出。
+ */
+function isMainModule(): boolean {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+}
+
 // 直接运行时启动 stdio 服务
-const isDirectRun = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
-if (isDirectRun) {
+if (isMainModule()) {
   main().catch((e) => {
     console.error(`[mcp-xxl-job] 启动失败: ${e instanceof Error ? e.message : e}`);
     process.exit(1);
