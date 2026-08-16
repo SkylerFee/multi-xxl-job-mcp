@@ -6,6 +6,10 @@
 
 MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MCP 协议让 AI 助手直接管理 XXL-JOB 定时任务。
 
+**GitHub Repository：[mcp‑xxl‑job](https://github.com/shaguocgl/mcp‑xxl‑job)**
+
+✅ This MCP server is indexed on [Glama.ai](https://glama.ai/mcp/servers/mcp‑xxl‑job)
+
 ## 功能特性
 
 - **执行器组管理** — 查询执行器组列表及在线机器地址
