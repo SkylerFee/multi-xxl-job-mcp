@@ -23,6 +23,10 @@ import {
   XxlJobInfo,
 } from "./models.js";
 
+/** 服务标识与版本，需与 package.json 保持一致（MCP 客户端用它在 initialize 握手中识别服务） */
+const SERVER_NAME = "multi-xxl-job-mcp";
+const SERVER_VERSION = "0.0.1";
+
 type ToolResult = {
   content: { type: "text"; text: string }[];
   isError?: boolean;
@@ -65,7 +69,7 @@ function jobToForm(job: XxlJobInfo): Record<string, string | number> {
 
 /** 构建并注册全部工具的 MCP Server（供启动入口与测试复用） */
 export function buildServer(client: XxlJobClient): McpServer {
-  const server = new McpServer({ name: "mcp-xxl-job", version: "1.0.1" });
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
   // ----------------------------------------------------------------
   // 执行器组
@@ -445,7 +449,7 @@ export async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stdio 服务通过标准输入/输出通信，日志只能走 stderr
-  console.error(`[mcp-xxl-job] 已启动，目标调度中心: ${config.baseUrl}`);
+  console.error(`[${SERVER_NAME}] 已启动，目标调度中心: ${config.baseUrl}`);
 }
 
 /**
@@ -472,7 +476,7 @@ function isMainModule(): boolean {
 // 直接运行时启动 stdio 服务
 if (isMainModule()) {
   main().catch((e) => {
-    console.error(`[mcp-xxl-job] 启动失败: ${e instanceof Error ? e.message : e}`);
+    console.error(`[${SERVER_NAME}] 启动失败: ${e instanceof Error ? e.message : e}`);
     process.exit(1);
   });
 }

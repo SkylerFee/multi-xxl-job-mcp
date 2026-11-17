@@ -5,13 +5,13 @@
 
 ## 一句话定位
 
-`mcp-xxl-job` 是一个 **stdio 传输的 MCP Server**：把 XXL-JOB 调度中心的 Web 管理接口，翻译成 12 个 AI 可以直接调用的工具。它自己不调度、不执行、不存数据——**所有状态都在调度中心**，它只是一个带会话的 HTTP 客户端 + 一层工具封装。
+`multi-xxl-job-mcp` 是一个 **stdio 传输的 MCP Server**：把 XXL-JOB 调度中心的 Web 管理接口，翻译成 12 个 AI 可以直接调用的工具。它自己不调度、不执行、不存数据——**所有状态都在调度中心**，它只是一个带会话的 HTTP 客户端 + 一层工具封装。
 
 ## 运行时拓扑
 
 ```mermaid
 flowchart LR
-    A["AI 客户端<br/>Claude Desktop / Cursor / DSH"] -->|"MCP over stdio<br/>JSON-RPC"| B["mcp-xxl-job 进程"]
+    A["AI 客户端<br/>Claude Desktop / Cursor / DSH"] -->|"MCP over stdio<br/>JSON-RPC"| B["multi-xxl-job-mcp 进程"]
     B -->|"HTTP + Cookie<br/>/login /jobinfo/* /joblog/*"| C["XXL-JOB 调度中心 Admin"]
     C -->|"注册 / 回调"| D["执行器<br/>业务代码"]
     C -.->|"派发执行请求"| D

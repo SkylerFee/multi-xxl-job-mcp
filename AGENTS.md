@@ -4,7 +4,7 @@
 
 ## 项目速览
 
-`mcp-xxl-job` —— 通过 MCP 协议（stdio 传输）让 AI 助手管理 XXL-JOB 调度中心的 MCP Server。
+`multi-xxl-job-mcp` —— 通过 MCP 协议（stdio 传输）让 AI 助手管理 XXL-JOB 调度中心的 MCP Server。fork 自 `shaguocgl/mcp-xxl-job`，现独立维护。
 
 - 语言/运行时：TypeScript + Node.js >= 18（ESM，`module: NodeNext`）
 - 关键依赖：`@modelcontextprotocol/sdk`、`zod`
