@@ -1,14 +1,14 @@
-# mcp-xxl-job
+# multi-xxl-job-mcp
 
-[![npm version](https://img.shields.io/npm/v/mcp-xxl-job.svg)](https://www.npmjs.com/package/mcp-xxl-job)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org/)
 
 MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MCP 协议让 AI 助手直接管理 XXL-JOB 定时任务。
 
-**GitHub Repository：[mcp‑xxl‑job](https://github.com/shaguocgl/mcp‑xxl‑job)**
+**GitHub Repository：[multi-xxl-job-mcp](https://github.com/SkylerFee/multi-xxl-job-mcp)**
 
-✅ This MCP server is indexed on [Glama.ai](https://glama.ai/mcp/servers/mcp‑xxl‑job)
+> 本项目 fork 自 [shaguocgl/mcp-xxl-job](https://github.com/shaguocgl/mcp-xxl-job)，
+> 在上游基础上更名为 `multi-xxl-job-mcp` 并独立维护。上游的 npm 包与 Glama 收录均与本项目无关。
 
 ## 功能特性
 
@@ -58,63 +58,64 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 
 在 MCP 客户端（如 Claude Desktop、Cursor、Qoder 等）中添加以下配置：
 
-**方式一：全局安装后使用（推荐）**
+> **本包暂未发布到 npm**，因此请从源码构建使用。以下配置中的 `command` 指向本地可执行文件。
 
-- 安装：
+**方式一：全局 link（推荐）**
+
+克隆并构建，然后用 `npm link` 把命令注册到全局：
+
 ```bash
-npm install -g mcp-xxl-job
+git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
+cd multi-xxl-job-mcp
+npm install
+npm run build
+npm link          # 之后任意位置可直接执行 multi-xxl-job-mcp
 ```
 
-> **升级**：全局安装的版本不会自动更新，需手动升级：
+> **升级**：拉取代码后重新构建即可，无需重新 link：
 > ```bash
-> npm update -g mcp-xxl-job
-> # 或
-> npm install -g mcp-xxl-job@latest
+> git pull && npm install && npm run build
 > ```
 
-- 配置：
+配置：
+
 ```json
 {
   "mcpServers": {
     "xxl-job": {
-      "command": "mcp-xxl-job",
+      "command": "multi-xxl-job-mcp",
       "env": {
         "XXL_JOB_URL": "http://127.0.0.1:8080/xxl-job-admin",
         "XXL_JOB_USERNAME": "admin",
-        "XXL_JOB_PASSWORD": "123456"
+        "XXL_JOB_PASSWORD": "<你的调度中心密码>"
       }
     }
   }
 }
 ```
 
-**方式二：通过 npx 使用**
+**方式二：直接指向构建产物（无需 link）**
 
-> **注意**：如果你的 npm 配置了国内镜像源（如 npmmirror），npx 可能无法找到包。此时请使用全局安装方式，或指定官方源：
-> ```bash
-> npx --registry=https://registry.npmjs.org mcp-xxl-job@latest
-> ```
->
-> 包名后加 `@latest` 可确保每次启动都获取最新版本（npx 有本地缓存，不加 `@latest` 可能会一直使用缓存的旧版本）。
+如果不想污染全局命令，直接把 `command` 写成 `node` + 指向构建产物的绝对路径：
 
-- 配置：
 ```json
 {
   "mcpServers": {
     "xxl-job": {
-      "command": "npx",
-      "args": ["-y", "mcp-xxl-job@latest"],
+      "command": "node",
+      "args": ["/绝对路径/multi-xxl-job-mcp/dist/src/server.js"],
       "env": {
         "XXL_JOB_URL": "http://127.0.0.1:8080/xxl-job-admin",
         "XXL_JOB_USERNAME": "admin",
-        "XXL_JOB_PASSWORD": "123456"
+        "XXL_JOB_PASSWORD": "<你的调度中心密码>"
       }
     }
   }
 }
 ```
 
-> **提示**：如果 npx 方式连接失败，请改用全局安装方式，或在 args 中添加 `"--registry=https://registry.npmjs.org"`。
+> **提示**：Windows 下路径需使用正斜杠或双反斜杠，例如 `C:/tools/multi-xxl-job-mcp/dist/src/server.js`。
+> **发布后**：本包若发布到 npm，则可改回 `npm install -g multi-xxl-job-mcp` / `npx -y multi-xxl-job-mcp@latest`。
 
 ## 使用示例
 
@@ -144,8 +145,8 @@ npm install -g mcp-xxl-job
 
 ```bash
 # 克隆项目
-git clone https://github.com/shaguocgl/mcp-xxl-job.git
-cd mcp-xxl-job
+git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
+cd multi-xxl-job-mcp
 
 # 安装依赖
 npm install
@@ -163,20 +164,20 @@ npm run dev
 ### 测试
 
 ```bash
-# 冒烟测试
+# 冒烟测试（不需要 XXL-JOB，校验工具注册）
 npm run smoke
 
-# 集成测试（需要可用的 XXL-JOB 实例）
+# 全链路集成测试（自带 Mock Admin，不需要真实实例）
 npm run test:integration
 
-# 客户端单元测试
+# 只读联调（需真实 XXL-JOB + XXL_JOB_* 环境变量）
 npm run test:client
 ```
 
 ## 项目结构
 
 ```
-mcp-xxl-job/
+multi-xxl-job-mcp/
 ├── src/
 │   ├── server.ts      # MCP 服务入口，注册所有工具
 │   ├── client.ts      # XXL-JOB Admin HTTP 客户端

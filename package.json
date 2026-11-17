@@ -1,15 +1,16 @@
 {
-  "name": "mcp-xxl-job",
-  "version": "1.0.1",
-  "description": "MCP Server for XXL-JOB admin: query/add/update jobs, start/stop, manual trigger and execution log viewing via XXL-JOB admin web API",
+  "name": "multi-xxl-job-mcp",
+  "version": "0.0.1",
+  "description": "Multi-instance MCP Server for XXL-JOB admin: query/add/update jobs, start/stop, manual trigger and execution log viewing via XXL-JOB admin web API",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "mcp-xxl-job": "dist/src/server.js"
+    "multi-xxl-job-mcp": "dist/src/server.js"
   },
   "main": "dist/src/server.js",
   "files": [
-    "dist"
+    "dist",
+    "!dist/tests"
   ],
   "scripts": {
     "build": "tsc",
@@ -17,14 +18,15 @@
     "dev": "tsc --watch",
     "smoke": "node dist/tests/smoke.js",
     "test:integration": "node dist/tests/integration.js",
-    "test:client": "node dist/tests/test-client.js"
+    "test:client": "node dist/tests/test-client.js",
+    "prepublishOnly": "npm run build && npm run smoke"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "zod": "^3.24.2"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

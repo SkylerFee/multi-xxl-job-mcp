@@ -6,9 +6,11 @@ dist/
 *.tsbuildinfo
 
 # Environment variables
+# 覆盖所有 .env 变体（.env.production / .env.staging 等），仅保留样例文件
+# 本项目 .env 中存放 XXL-JOB 管理员账号密码，绝不能入库
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Logs
 logs/
@@ -51,6 +53,7 @@ Desktop.ini
 .cache/
 .temp/
 *.tmp
+*.tgz
 
 # Agent scratch / local npm cache
 tmp/
