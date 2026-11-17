@@ -1,0 +1,29 @@
+# 依赖变更审查：拦截引入已知漏洞或不合规许可证的 PR
+#
+# 仅在 PR 上运行；需要 "Dependency graph" 已启用（本仓库已开启 Dependabot 告警）。
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: 审查依赖变更
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # 出现 high 及以上漏洞时直接失败
+          fail-on-severity: high
+          # 允许的许可证白名单：本项目为 MIT
+          allow-licenses: MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD
+          comment-summary-in-pr: on-failure

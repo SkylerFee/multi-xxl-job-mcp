@@ -1,0 +1,6 @@
+# 默认由仓库所有者审查所有变更
+* @SkylerFee
+
+# CI 与发布配置属敏感路径，变更需额外留意
+/.github/ @SkylerFee
+/package.json @SkylerFee

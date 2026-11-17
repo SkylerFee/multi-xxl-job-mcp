@@ -1,0 +1,9 @@
+# 引导用户走正确的入口，避免空白 issue 与公开披露安全漏洞
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞报告
+    url: https://github.com/SkylerFee/multi-xxl-job-mcp/security/advisories/new
+    about: 请勿通过公开 issue 报告安全问题，使用私密漏洞报告。
+  - name: 使用文档
+    url: https://github.com/SkylerFee/multi-xxl-job-mcp#readme
+    about: 安装、配置与工具清单见 README。

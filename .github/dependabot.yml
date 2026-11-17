@@ -1,0 +1,37 @@
+# Dependabot 自动更新依赖
+#
+# - npm 生态每周检查一次，开发依赖与运行时依赖分组以便合并
+# - GitHub Actions 也纳入更新（我们固定了 SHA，需 Dependabot 帮忙跟进）
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+    groups:
+      # 补丁与次版本打包成一个 PR，减少噪音
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - dependencies

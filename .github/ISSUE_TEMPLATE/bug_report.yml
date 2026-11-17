@@ -1,0 +1,86 @@
+---
+name: Bug 报告
+description: 报告一个可复现的缺陷
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。提交前请先搜索已有 issue，避免重复。
+        **安全漏洞请勿在此提交**，请按 SECURITY.md 的流程私下报告。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 发生了什么？与预期有何不同？
+      placeholder: 调用 list_jobs 时返回……
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请尽量给出最小复现路径（MCP 客户端、配置、调用的工具与参数）。
+      placeholder: |
+        1. 配置 mcpServers …
+        2. 在客户端输入 "查询任务列表"
+        3. 观察到 …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: multi-xxl-job-mcp 版本
+      description: "package.json 中的 version（当前为 0.0.1）"
+      placeholder: 0.0.1
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js 版本
+      placeholder: v20.11.0
+    validations:
+      required: true
+
+  - type: input
+    id: xxl-job-version
+    attributes:
+      label: XXL-JOB 版本
+      placeholder: 2.4.0
+    validations:
+      required: false
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: 使用的 MCP 客户端
+      options:
+        - Claude Desktop
+        - Cursor
+        - Qoder
+        - Trae
+        - 其他（请在下方说明）
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 服务端 stderr 输出或客户端报错信息。**请务必删除真实地址、账号与密码。**
+      render: shell
+    validations:
+      required: false

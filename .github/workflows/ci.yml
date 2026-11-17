@@ -1,0 +1,98 @@
+# 持续集成：构建 + 冒烟测试 + 多版本兼容验证
+#
+# 设计要点：
+# - permissions 收窄到 contents: read，遵循最小权限原则
+# - 所有第三方 action 固定到完整 commit SHA，杜绝 tag 被移动导致的供应链攻击
+# - 并行跑 smoke 与 integration，两者都自带 Mock Admin，无需真实 XXL-JOB
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [18, 20, 22]
+        include:
+          # 额外验证 macOS 上的 realpath 符号链接逻辑（server.ts 的入口判定依赖它）
+          - os: macos-latest
+            node: 22
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check and build
+        run: npm run build
+
+      - name: Smoke test (无需真实 XXL-JOB)
+        run: npm run smoke
+
+      - name: Integration test (自带 Mock Admin)
+        run: npm run test:integration
+
+  package-check:
+    name: 发布产物校验
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      # 确保测试代码不会被意外打进 npm 包（files 字段应排除 dist/tests）
+      - name: Verify package contents exclude tests
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const files = require("/tmp/pack.json")[0].files.map(f => f.path);
+            const leaked = files.filter(p => p.startsWith("dist/tests"));
+            console.log("打包文件数:", files.length);
+            if (leaked.length > 0) {
+              console.error("错误: 测试文件被打进 npm 包:", leaked);
+              process.exit(1);
+            }
+            const required = ["dist/src/server.js", "package.json", "LICENSE"];
+            const missing = required.filter(p => !files.includes(p));
+            if (missing.length > 0) {
+              console.error("错误: 包内缺少必需文件:", missing);
+              process.exit(1);
+            }
+            console.log("发布产物体检通过");
+          '
