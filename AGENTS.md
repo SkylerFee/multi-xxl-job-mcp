@@ -28,6 +28,81 @@ npm run test:client       # 只读联调，需真实 Admin + XXL_JOB_* 环境变
 > 会报 `EPERM ... _cacache`。改用工作区内缓存：
 > `npm install --cache ./tmp/npm-cache --no-audit --no-fund`。
 
+## 开发流程（强制）
+
+**任何修改都必须走完整流程，禁止直接向 `master` 提交。** `master` 是发布线，只接受经过评审的合并。
+
+### 五步流程
+
+1. **建分支** —— 从最新 `master` 切出，命名遵循下表
+2. **开发** —— 小步提交，提交信息用 Conventional Commits
+3. **验证** —— 本地跑完「验证清单」，全绿才能继续
+4. **提 PR** —— 推送分支并开 PR，正文说明问题、改动、验证方式
+5. **合并** —— 等 CI 全绿后合并（squash），并删除远程分支
+
+```bash
+# 1. 建分支（先同步主干）
+git switch master && git pull
+git switch -c fix/unify-server-identity
+
+# 2-3. 开发并本地验证
+npm run build && npm run smoke && npm run test:integration
+
+# 4. 提 PR
+git push -u origin fix/unify-server-identity
+gh pr create --base master --head fix/unify-server-identity \
+  --title 'fix: 简述改动' --body-file tmp/pr-body.md
+
+# 5. 等 CI 通过后合并
+gh pr checks --watch
+gh pr merge <number> --squash --delete-branch
+```
+
+### 分支命名
+
+| 前缀 | 用途 | 示例 |
+|---|---|---|
+| `feat/` | 新功能 | `feat/multi-instance-support` |
+| `fix/` | 缺陷修复 | `fix/node-18-getsetcookie` |
+| `docs/` | 仅文档 | `docs/architecture-notes` |
+| `chore/` | 依赖、配置、CI | `chore/bump-sdk` |
+| `refactor/` | 不改行为的重构 | `refactor/client-request-layer` |
+
+### 验证清单
+
+合并前本地必须全部通过：
+
+```bash
+npm run build             # 类型检查与编译
+npm run smoke             # 工具注册完整性
+npm run test:integration  # 全链路，自带 Mock Admin
+```
+
+改动涉及真实 Admin 行为时，再补跑 `npm run test:client`（需 `XXL_JOB_*` 环境变量，只读）。
+
+改动涉及 MCP 握手标识、启动日志时，额外验证实际启动：
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"p","version":"1"}}}' \
+  | XXL_JOB_URL=http://127.0.0.1:9/xxl-job-admin XXL_JOB_USERNAME=a XXL_JOB_PASSWORD=b \
+    node dist/src/server.js 2>/dev/null | head -c 300
+```
+
+### 合并方式
+
+- **squash merge**，一个 PR 对应主干上的一个提交
+- 合并后删除远程分支；本地分支可保留至确认无误
+- 依赖升级由 Dependabot 开 PR，同样走 CI
+
+### 例外
+
+只有以下情况可以直接在 `master` 上操作，且事后告知：
+
+- 回滚一次已经把主干弄坏的错误合并（用 `git revert`，不要 force push）
+- 仓库初始化、首次提交这类不存在评审对象的情形
+
+**其余一律走分支 + PR。** 拿不准时按流程走——多开一个 PR 的成本远低于污染发布线。
+
 ## 改动约定
 
 - 新增/修改 MCP 工具时，同步更新三处：`src/server.ts` 的 `registerTool`、
