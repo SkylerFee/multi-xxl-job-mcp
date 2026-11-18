@@ -1,0 +1,40 @@
+# multi-xxl-job-mcp 配置文件示例
+#
+# 放置位置（程序按平台自动判定，用 "multi-xxl-job-mcp init" 可自动生成）：
+#   Linux:   $XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml
+#            （未设置 XDG_CONFIG_HOME 时为 ~/.config/multi-xxl-job-mcp/config.yaml）
+#   macOS:   ~/Library/Application Support/multi-xxl-job-mcp/config.yaml
+#   Windows: %APPDATA%\multi-xxl-job-mcp\config.yaml
+#
+# 结构是两层：系统（systems）→ 环境（instances）。
+# 一个业务系统可以有任意多套环境，每套环境指向一个独立的 XXL-JOB 调度中心。
+
+systems:
+  # 系统键名即工具调用时的 system 参数，只能包含字母、数字、下划线和连字符
+  order:
+    # alias 是可读名称，只用于 list_instances 展示，不参与寻址，可以写中文
+    alias: 订单系统
+
+    # 环境键名即工具调用时的 env 参数，同样受命名规则限制
+    instances:
+      dev:
+        url: http://127.0.0.1:8080/xxl-job-admin
+        username: admin
+        password: 123456
+
+      prod:
+        url: https://order-xxl.example.com/xxl-job-admin
+        # 字段值支持 ${VAR} 环境变量插值，密码建议这样写以免明文落盘。
+        # 变量未设置时会直接报错，不会静默用空串登录。
+        username: ${ORDER_PROD_USER}
+        password: ${ORDER_PROD_PASS}
+        # HTTP 超时（毫秒），可选，默认 15000
+        timeoutMs: 30000
+
+  payment:
+    alias: 支付系统
+    instances:
+      dev:
+        url: http://127.0.0.1:8081/xxl-job-admin
+        username: admin
+        password: 123456

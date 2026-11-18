@@ -8,20 +8,24 @@
 
 - 语言/运行时：TypeScript + Node.js >= 18（ESM，`module: NodeNext`）
 - 关键依赖：`@modelcontextprotocol/sdk`、`zod`
-- 源码：`src/server.ts`（工具注册）、`src/client.ts`（Admin HTTP 客户端 + 登录 Cookie）、
-  `src/config.ts`（环境变量）、`src/models.ts`（数据结构与校验）
-- 测试：`tests/smoke.ts`（InMemoryTransport 校验工具注册）、
-  `tests/integration.ts`（自带 Mock Admin，全链路 23 项断言）、
-  `tests/test-client.ts`（只读联调，需真实 Admin）、`tests/mock-admin.ts`（Mock 服务器实现）
+- 源码：`src/server.ts`（13 个工具注册）、`src/registry.ts`（`(system,env)` → 客户端）、
+  `src/cli.ts`（init 子命令）、`src/client.ts`（Admin HTTP 客户端 + 登录 Cookie）、
+  `src/config.ts`（配置解析/插值/校验/平台路径）、`src/models.ts`（数据结构与校验）
+- 测试：4 个离线测试文件共 161 项断言 —— `config.test.ts`(31)、`registry.test.ts`(53)、
+  `cli.test.ts`(36)、`integration.ts`(41)；另有 `smoke.ts`(13 工具) 与
+  `test-client.ts`(需真实 Admin)、`mock-admin.ts`(Mock 服务器实现)
 
 ## 常用命令
 
 ```bash
-npm install            # 依赖
-npm run build          # tsc -> dist/
-npm run smoke          # 冒烟测试，无需 XXL-JOB
-npm run test:integration  # 全链路集成测试，自带 Mock Admin，无需真实实例
-npm run test:client       # 只读联调，需真实 Admin + XXL_JOB_* 环境变量
+npm install             # 依赖
+npm run build           # tsc -> dist/
+npm run smoke           # 13 个工具注册 + 双参数校验
+npm run test:config     # 配置解析层（纯函数）
+npm run test:registry   # 目标注册表（注入假客户端）
+npm run test:cli        # init 子命令
+npm run test:integration # 全链路，两个 Mock 目标，验证隔离
+npm run test:client      # 只读联调，需已生成配置 + 可达的真实 Admin
 ```
 
 > **沙箱注意**：本机 npm 全局缓存在 `~/.npm`，在 workspace-write 沙箱下不可写，直接 `npm install`
@@ -80,12 +84,14 @@ npm run test:integration  # 全链路，自带 Mock Admin
 
 改动涉及真实 Admin 行为时，再补跑 `npm run test:client`（需 `XXL_JOB_*` 环境变量，只读）。
 
-改动涉及 MCP 握手标识、启动日志时，额外验证实际启动：
+改动涉及 MCP 握手标识、启动日志时，额外验证实际启动（用临时 HOME 隔离，避免读你真实配置）：
 
 ```bash
+export TMPHOME=$(mktemp -d)
+printf '\n\n\n\npass\n' | HOME="$TMPHOME" node dist/src/server.js init >/dev/null 2>&1
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"p","version":"1"}}}' \
-  | XXL_JOB_URL=http://127.0.0.1:9/xxl-job-admin XXL_JOB_USERNAME=a XXL_JOB_PASSWORD=b \
-    node dist/src/server.js 2>/dev/null | head -c 300
+  | HOME="$TMPHOME" node dist/src/server.js 2>/dev/null | head -c 300
+rm -rf "$TMPHOME"
 ```
 
 ### 合并方式

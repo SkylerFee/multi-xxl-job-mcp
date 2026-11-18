@@ -25,22 +25,34 @@ flowchart LR
 
 ## 代码分层
 
-四个文件，职责单一，依赖是单向的：
+六个文件，职责单一，依赖是单向的：
 
 ```
-config.ts ──► client.ts ──► server.ts
-                 ▲             ▲
-                 └── models.ts ┘   （类型 + 纯校验函数，无副作用）
+config.ts ──► registry.ts ──► server.ts
+                 │               ▲
+                 ▼               │
+             client.ts ──────────┤
+                 ▲               │
+                 └── models.ts ──┘   （类型 + 纯校验函数，无副作用）
+
+cli.ts ──► config.ts   （init 只依赖配置层，不碰 client 与 registry）
 ```
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `src/config.ts` | 从环境变量读连接信息，缺什么就报什么 | `loadConfig()` |
+| `src/config.ts` | 解析 YAML/JSON 配置、`${VAR}` 插值、两层结构校验、平台路径判定 | `loadConfigFromDefaultPath()`、`resolveConfigPath()` |
+| `src/registry.ts` | `(system, env)` → 懒创建并缓存的客户端 | `TargetRegistry.get()`、`list()`、`describe()` |
+| `src/cli.ts` | `init` 子命令，交互式生成配置 | `runInit()` |
 | `src/models.ts` | 与 Admin 对齐的数据结构、默认值、纯校验 | `JOB_DEFAULTS`、`validateSchedule()`、`pageTotal()` |
 | `src/client.ts` | 会话管理 + 13 个 Admin 接口的封装 | `XxlJobClient` |
-| `src/server.ts` | 工具注册、参数 schema、结果整形 | `buildServer()`、`main()` |
+| `src/server.ts` | 工具注册、参数 schema、结果整形、CLI 子命令分发 | `buildServer(registry)`、`main()` |
 
-这个分层有一个明确的设计意图：**`buildServer(client)` 接受注入的 client，而不是自己 new 一个**。所以测试可以在不启动真实 Admin 的情况下，把任意 client 形状塞进去跑工具逻辑（`tests/smoke.ts:35`）。这是全仓最重要的一条缝（seam）。
+这个分层有两个明确的设计意图：
+
+1. **`buildServer(registry)` 接受注入的注册表，而不是自己读配置**。测试可以在不启动真实 Admin、也不写配置文件的情况下，把一份内存配置塞进去跑工具逻辑。
+2. **`TargetRegistry` 接受注入的客户端工厂**。测试因此可以用假客户端验证「同目标复用、不同目标隔离」，完全不发网络请求（`tests/registry.test.ts`）。
+
+这两条缝让整套逻辑都可以在没有外部依赖的情况下被验证——目前 4 个测试文件共 161 项断言，全部离线运行。
 
 ## 一次工具调用的完整生命周期
 
@@ -50,11 +62,20 @@ config.ts ──► client.ts ──► server.ts
 sequenceDiagram
     participant AI
     participant S as server.ts
+    participant R as registry.ts
     participant C as client.ts
     participant A as Admin
 
-    AI->>S: callTool("list_jobs", {...})
+    AI->>S: callTool("list_jobs", {system:"order", env:"dev", ...})
     S->>S: zod 校验 + 补默认值
+    S->>R: get("order", "dev")
+    alt 该目标已有客户端
+        R-->>S: 缓存的 client（登录态复用）
+    else 首次访问该目标
+        R->>R: 校验 system / env 存在
+        R->>C: new XxlJobClient(config)
+        R-->>S: 新 client
+    end
     S->>C: listJobs(page, pageSize, filter)
     C->>C: ensureLoggedIn()
     alt 尚未登录
@@ -70,7 +91,11 @@ sequenceDiagram
     S-->>AI: recordsTotal + jobs
 ```
 
-注意第 2 步和第 8 步：**参数补默认值在 server 层，响应整形也在 server 层**，client 只管忠实转发。这样 client 可以被 test-client 之类的脚本直接复用。
+三个值得注意的点：
+
+- **目标校验先于任何网络请求**。未知 `system`/`env` 在 `registry.get()` 就抛错，不会产生副作用——这对 `remove_job` 尤其重要。
+- **参数补默认值与响应整形都在 server 层**，client 只管忠实转发，因此 client 可以被 test-client 之类的脚本直接复用。
+- **每个目标一份独立的 client 与会话**。order/dev 与 order/prod 各自登录、各自持 Cookie，互不影响。
 
 ## 四个贯穿全局的设计
 
@@ -78,7 +103,9 @@ sequenceDiagram
 
 ### 1. 会话：一份 Cookie，失效只重登一次
 
-`XxlJobClient` 在内存里维护一个 `Map` 存 Cookie。三个机制配合：
+`XxlJobClient` 在内存里维护一个 `Map` 存 Cookie。**每个目标一个独立实例**，所以会话天然隔离——不需要按目标给 Cookie 加前缀，也不需要担心串号。
+
+三个机制配合：
 
 - `ensureLoggedIn()`（`client.ts:67`）用 `loggingIn` 这个 Promise 做闸门，多个工具并发调用时只真正登录一次。
 - `requestOnce()`（`client.ts:183`）遇到 302 跳登录页，就把 `loggedIn` 置回 false、重新登录、**重试一次**。只重试一次是有意的：无限重试会在密码错时打成死循环。
@@ -116,9 +143,15 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 - **空字符串参数不能过滤掉**（`client.ts:191`）→ 部分版本把 `appname`／`jobDesc` 等标为必填，缺了直接 HTTP 400，所以显式传空串。
 - **`logDetailCat` 可能不返回 `isEnd`**（`client.ts:385`）→ 用「内容为空」推断已读完，避免调用方无限续读。
 
-## 12 个工具
+## 13 个工具
 
-按功能分四组。完整参数 schema 见 `src/server.ts`，这里只记**语义上必须知道的**。
+按功能分组。**除 `list_instances` 外，每个工具都必须传 `system` 与 `env`**。完整参数 schema 见 `src/server.ts`，这里只记**语义上必须知道的**。
+
+### 目标发现
+
+| 工具 | 底层 | 要点 |
+|---|---|---|
+| `list_instances` | 无网络请求 | 读注册表内存中的配置，按系统分组；**不含密码**；`usesEnvVars` 标记该目标是否用了插值 |
 
 ### 执行器组
 
@@ -134,7 +167,7 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 | `get_job` | `GET /jobinfo/getById` | 接口缺失时降级分页扫描 |
 | `add_job` | `POST /jobinfo/add` | 默认停止状态；未传字段取 `JOB_DEFAULTS`；返回新 id |
 | `update_job` | getById + `POST /jobinfo/update` | 读取-合并-写回；**不处理启停** |
-| `remove_job` | `POST /jobinfo/remove` | 不可恢复；**当前无任何测试覆盖**（见下） |
+| `remove_job` | `POST /jobinfo/remove` | 不可恢复；**强制显式传目标**，未知目标在发起请求前就失败 |
 | `start_job` | `POST /jobinfo/start` | 只切换调度状态，不立即执行 |
 | `stop_job` | `POST /jobinfo/stop` | 停止自动调度，配置保留 |
 | `trigger_job` | `POST /jobinfo/trigger` | 立即执行一次，**不影响** triggerStatus |
@@ -158,23 +191,31 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 | 1 | Node **< 18.15** 上登录「成功」但 Cookie 存不下，之后每个请求都报「登录态失效」 | `client.ts:78` 的 `resp.headers.getSetCookie?.()` 在缺失时静默取空数组 | 在 Node 18.14.0 实跑集成测试：23 项断言大面积失败；18.15.0 起全部通过 | `package.json` 声明 engines.node >= 18，实际需要 **>= 18.15** |
 | 2 | Admin 返回 text/html 且页面里不含 login 时，抛 `TypeError: Body is unusable` 而不是可读错误 | `isAuthRedirect()` 先 `resp.text()` 消费了响应体，`parseReturnT()` 再读一次 | 本地起一个返回 502 HTML 页的服务实测复现 | 反向代理／网关出错时，用户看到的是 JS 内部错误而非「调度中心不可达」 |
 | 3 | handleCode=502（执行超时）被显示成「未完成」 | `server.ts:399-404` | 上游 `XxlJobContext.HANDLE_CODE_TIMEOUT = 502` | 超时会被误读成「还在跑」，排查方向带偏 |
-| 4 | `remove_job` 没有任何测试 | `tests/smoke.ts:12` 的 EXPECTED_TOOLS 只有 11 项；integration 未调用它 | 冒烟输出「已注册工具数: 12」但文案写「全部 11 个工具注册成功」 | 删除这条破坏性路径完全裸奔 |
+| 4 | ~~`remove_job` 没有任何测试~~ **已修复** | 根因是 `tests/mock-admin.ts` 从未实现 `/jobinfo/remove` 端点 | 多系统改造中补上该端点，`remove_job` 现由集成测试端到端覆盖 | — |
 | 5 | `trigger_job` 里的 code 非 200 检查是死代码 | `client.ts:329`，`request()` 已在 `client.ts:165` 抛过 | — | 无功能影响，读代码时的噪声 |
 
 ## 测试怎么分工
 
 | 命令 | 需要什么 | 覆盖什么 |
 |---|---|---|
-| `npm run smoke` | 无 | 工具注册齐全（11 项断言，缺 remove_job） |
-| `npm run test:integration` | 无（自带 Mock Admin） | 全链路 23 项断言，含非法 Cron、Cookie 失效重登 |
-| `npm run test:client` | 真实 Admin + XXL_JOB_* | 只读联调：登录、查组、查任务、查日志正文 |
+| `npm run test:config` | 无 | 配置解析 31 项：YAML/JSON、插值、结构校验、权限、三平台路径 |
+| `npm run test:registry` | 无 | 注册表 53 项：同目标复用、跨目标隔离、未知目标错误、不泄漏密码 |
+| `npm run test:cli` | 无 | init 子命令 36 项：默认值、覆盖确认、EOF 中断、权限 600 |
+| `npm run smoke` | 无 | 13 个工具注册 + 「所有操作类工具都要求 system/env」 |
+| `npm run test:integration` | 无（自带两个 Mock Admin） | 全链路 41 项，含目标隔离、未知目标无副作用、remove_job 端到端 |
+| `npm run test:client` | 真实 Admin + 已生成的配置 | 只读联调：登录、查组、查任务、查日志正文 |
 
-`tests/mock-admin.ts` 是这套测试能「零依赖」的关键：它按真实 Admin 的语义实现了登录、302 拦截、ReturnT 与裸分页两种响应形状。**改 client 时如果新增接口，要在 mock 里补对应端点**，否则集成测试测不到。
+**共 4 个离线测试文件、161 项断言**，除 `test:client` 外全部不需要网络。
+
+`tests/mock-admin.ts` 是这套测试能「零依赖」的关键：它按真实 Admin 的语义实现了登录、302 拦截、ReturnT 与裸分页两种响应形状，并在随机端口启动——**起两个即为两个独立目标**，集成测试正是这样验证目标隔离的。
+
+> 教训：`remove_job` 长期没有测试，不是「忘了写」，而是 mock 里根本没有 `/jobinfo/remove` 端点，无从测起。**改 client 时如果新增接口，要在 mock 里补对应端点**，否则测试会静默漏掉整条路径。
 
 ## 读代码的建议顺序
 
-1. `src/config.ts`（51 行）—— 先看清需要哪些外部输入
-2. `src/models.ts`（163 行）—— 数据结构 + 默认值，决定了工具参数长什么样
-3. `src/client.ts:96-218` —— 请求通道与会话，理解其余部分的前提
-4. `src/server.ts:42-64` 的 `jobToForm` —— 看懂它就看懂了 update 的坑
-5. 剩下的工具注册可以挑着看，都是同一套模式
+1. `src/config.ts` —— 配置从哪来、长什么样、如何校验
+2. `src/registry.ts`（约 220 行）—— 目标如何寻址、客户端如何复用
+3. `src/models.ts` —— 数据结构 + 默认值，决定了工具参数长什么样
+4. `src/client.ts:96-218` —— 请求通道与会话，理解其余部分的前提
+5. `src/server.ts` 的 `jobToForm` —— 看懂它就看懂了 update 的坑
+6. 剩下的工具注册可以挑着看，都是同一套模式

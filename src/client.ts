@@ -55,7 +55,7 @@ export class XxlJobClient {
     const result = (await this.parseReturnT(resp, "/login")) as ReturnT;
     if (result.code !== 200) {
       throw new XxlJobApiError(
-        `登录 XXL-JOB 失败: ${result.msg || "未知错误"}（请检查 XXL_JOB_USERNAME / XXL_JOB_PASSWORD）`,
+        `登录 XXL-JOB 失败: ${result.msg || "未知错误"}（请检查配置文件中的 username / password）`,
         result.code,
         "/login",
       );
@@ -108,7 +108,7 @@ export class XxlJobClient {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new XxlJobApiError(
-        `请求 XXL-JOB 调度中心失败（${url}）: ${msg}。请确认 XXL_JOB_URL 可达`,
+        `请求 XXL-JOB 调度中心失败（${url}）: ${msg}。请确认配置文件中的 url 可达`,
         undefined,
         url,
       );
