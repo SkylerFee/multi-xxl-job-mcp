@@ -53,6 +53,9 @@ jobs:
       - name: Smoke test (无需真实 XXL-JOB)
         run: npm run smoke
 
+      - name: Config unit tests (纯函数，无外部依赖)
+        run: npm run test:config
+
       - name: Integration test (自带 Mock Admin)
         run: npm run test:integration
 
