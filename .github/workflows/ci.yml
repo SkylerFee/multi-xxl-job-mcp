@@ -28,7 +28,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node: [18, 20, 22]
+        # 18.15.0 是下限（Headers.prototype.getSetCookie 自 18.15 起才有，缺失会导致登录态静默失效）。
+        # 只写 18 会解析到 18.x 最新，照不到下限，所以单独钉一格。
+        node: [18, 18.15.0, 20, 22]
         include:
           # 额外验证 macOS 上的 realpath 符号链接逻辑（server.ts 的入口判定依赖它）
           - os: macos-latest
@@ -53,8 +55,16 @@ jobs:
       - name: Smoke test (无需真实 XXL-JOB)
         run: npm run smoke
 
+      # 每个 test:* 脚本都必须在这里显式列一遍：只跑某个聚合脚本不会自动发现新脚本。
+      # 历史上 test:registry 与 test:cli 就因此从未在 CI 执行过。
       - name: Config unit tests (纯函数，无外部依赖)
         run: npm run test:config
+
+      - name: Registry unit tests (注入假客户端，无网络)
+        run: npm run test:registry
+
+      - name: CLI (init 子命令) unit tests
+        run: npm run test:cli
 
       - name: Integration test (自带 Mock Admin)
         run: npm run test:integration

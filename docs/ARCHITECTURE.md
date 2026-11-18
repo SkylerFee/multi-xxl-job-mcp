@@ -188,7 +188,7 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 
 | # | 现象 | 位置 | 证据 | 影响 |
 |---|---|---|---|---|
-| 1 | Node **< 18.15** 上登录「成功」但 Cookie 存不下，之后每个请求都报「登录态失效」 | `client.ts:78` 的 `resp.headers.getSetCookie?.()` 在缺失时静默取空数组 | 在 Node 18.14.0 实跑集成测试：23 项断言大面积失败；18.15.0 起全部通过 | `package.json` 声明 engines.node >= 18，实际需要 **>= 18.15** |
+| 1 | ~~Node **< 18.15** 上登录「成功」但 Cookie 存不下，之后每个请求都报「登录态失效」~~ **已修复** | `client.ts:78` 的 `resp.headers.getSetCookie?.()` 在缺失时静默取空数组 | 在 Node 18.14.0 实跑集成测试：23 项断言大面积失败；18.15.0 起全部通过 | `package.json` 声明 engines.node >= 18，实际需要 **>= 18.15**。**修复方式**：`engines.node` 收紧为 `>=18.15`，CI matrix 增加 `18.15.0` 一格以照住下限（只写 `18` 会解析到 18.x 最新，测不到下限） |
 | 2 | Admin 返回 text/html 且页面里不含 login 时，抛 `TypeError: Body is unusable` 而不是可读错误 | `isAuthRedirect()` 先 `resp.text()` 消费了响应体，`parseReturnT()` 再读一次 | 本地起一个返回 502 HTML 页的服务实测复现 | 反向代理／网关出错时，用户看到的是 JS 内部错误而非「调度中心不可达」 |
 | 3 | handleCode=502（执行超时）被显示成「未完成」 | `server.ts:399-404` | 上游 `XxlJobContext.HANDLE_CODE_TIMEOUT = 502` | 超时会被误读成「还在跑」，排查方向带偏 |
 | 4 | ~~`remove_job` 没有任何测试~~ **已修复** | 根因是 `tests/mock-admin.ts` 从未实现 `/jobinfo/remove` 端点 | 多系统改造中补上该端点，`remove_job` 现由集成测试端到端覆盖 | — |

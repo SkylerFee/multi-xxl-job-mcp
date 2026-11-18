@@ -1,7 +1,7 @@
 # multi-xxl-job-mcp
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org/)
+[![Node.js >= 18.15](https://img.shields.io/badge/node-%3E%3D18.15-green.svg)](https://nodejs.org/)
 
 MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MCP 协议让 AI 助手直接管理 XXL-JOB 定时任务。
 
@@ -42,7 +42,8 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 
 ## 环境要求
 
-- **Node.js** >= 18
+- **Node.js** >= 18.15（低于 18.15 缺少 `Headers.prototype.getSetCookie`，登录会「成功」但存不下 Cookie，
+  之后每个请求都报「登录态失效」；详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「已知脆弱点」）
 - **XXL-JOB Admin** >= 2.3.0
 
 
@@ -294,7 +295,7 @@ multi-xxl-job-mcp/
 
 ## 技术栈
 
-- **Runtime**: Node.js >= 18
+- **Runtime**: Node.js >= 18.15
 - **Language**: TypeScript
 - **MCP SDK**: @modelcontextprotocol/sdk
 - **Schema Validation**: Zod

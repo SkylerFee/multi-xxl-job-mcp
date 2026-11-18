@@ -6,7 +6,7 @@
 
 `multi-xxl-job-mcp` —— 通过 MCP 协议（stdio 传输）让 AI 助手管理 XXL-JOB 调度中心的 MCP Server。fork 自 `shaguocgl/mcp-xxl-job`，现独立维护。
 
-- 语言/运行时：TypeScript + Node.js >= 18（ESM，`module: NodeNext`）
+- 语言/运行时：TypeScript + Node.js >= 18.15（ESM，`module: NodeNext`）
 - 关键依赖：`@modelcontextprotocol/sdk`、`zod`
 - 源码：`src/server.ts`（13 个工具注册）、`src/registry.ts`（`(system,env)` → 客户端）、
   `src/cli.ts`（init 子命令）、`src/client.ts`（Admin HTTP 客户端 + 登录 Cookie）、
@@ -49,8 +49,8 @@ npm run test:client      # 只读联调，需已生成配置 + 可达的真实 A
 git switch master && git pull
 git switch -c fix/unify-server-identity
 
-# 2-3. 开发并本地验证
-npm run build && npm run smoke && npm run test:integration
+# 2-3. 开发并本地验证（脚本清单以 package.json 为准，见下方「验证清单」）
+npm run build && npm run smoke && npm test
 
 # 4. 提 PR
 git push -u origin fix/unify-server-identity
@@ -74,15 +74,20 @@ gh pr merge <number> --squash --delete-branch
 
 ### 验证清单
 
-合并前本地必须全部通过：
+**`package.json` 的 `scripts` 是唯一权威来源，不要按记忆挑脚本。** 历史上这里只列举了三步，
+导致 `test:registry`、`test:cli` 长期没被任何流程跑过。合并前本地必须全部通过：
 
 ```bash
-npm run build             # 类型检查与编译
-npm run smoke             # 工具注册完整性
-npm run test:integration  # 全链路，自带 Mock Admin
+npm run build   # 必须最先跑：其余脚本执行的都是 dist/ 产物
+npm run smoke   # 工具注册完整性（不属于 test:* 命名空间，故单独列一行）
+npm test        # 串行跑尽 package.json 里所有 test:* 脚本（自动跳过需真实 Admin 的 test:client）
 ```
 
-改动涉及真实 Admin 行为时，再补跑 `npm run test:client`（需 `XXL_JOB_*` 环境变量，只读）。
+`npm test` 从 `package.json` 读取脚本名（见 `scripts/test-all.mjs`），因此**新增 `test:*` 脚本会自动被包含**，
+不会因为某份文档没同步而漏跑。**但 `.github/workflows/ci.yml` 里是逐条列举的**，新增 `test:*` 脚本时
+必须同步加一个 CI step，否则该脚本仍然只在本地被跑。
+
+改动涉及真实 Admin 行为时，再补跑 `npm run test:client`（需已生成的配置文件 + 可达的 Admin，只读）。
 
 改动涉及 MCP 握手标识、启动日志时，额外验证实际启动（用临时 HOME 隔离，避免读你真实配置）：
 
