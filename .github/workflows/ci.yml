@@ -66,6 +66,9 @@ jobs:
       - name: CLI (init 子命令) unit tests
         run: npm run test:cli
 
+      - name: Regression tests (已修复脆弱点)
+        run: npm run test:regression
+
       - name: Integration test (自带 Mock Admin)
         run: npm run test:integration
 

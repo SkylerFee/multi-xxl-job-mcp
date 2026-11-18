@@ -24,7 +24,8 @@
     "test:config": "node dist/tests/config.test.js",
     "test:registry": "node dist/tests/registry.test.js",
     "test:cli": "node dist/tests/cli.test.js",
-    "test": "node scripts/test-all.mjs"
+    "test": "node scripts/test-all.mjs",
+    "test:regression": "node dist/tests/regression.test.js"
   },
   "engines": {
     "node": ">=18.15"
