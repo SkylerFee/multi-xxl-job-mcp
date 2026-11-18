@@ -1,15 +1,18 @@
 /**
  * 联调脚本：连接真实 XXL-JOB 调度中心，逐步验证只读类接口。
  *
- * 运行前提：设置环境变量 XXL_JOB_URL / XXL_JOB_USERNAME / XXL_JOB_PASSWORD
- * 运行方式：npm run build && npm run test:client
+ * 运行前提：已用 "multi-xxl-job-mcp init" 生成配置文件（或手动创建）
+ * 运行方式：npm run build && npm run test:client [system] [env]
+ *
+ * 默认目标为 order/dev；也可用参数指定，如：
+ *   node dist/tests/test-client.js payment prod
  *
  * 注意：本脚本只执行【只读】操作（登录、查组、查任务、查日志），
  * 不会新增/修改/触发任何任务，可放心在生产环境运行。
  */
 
 import { XxlJobClient } from "../src/client.js";
-import { loadConfig } from "../src/config.js";
+import { loadConfigFromDefaultPath } from "../src/config.js";
 import { pageTotal } from "../src/models.js";
 
 function step(title: string): void {
@@ -17,10 +20,28 @@ function step(title: string): void {
 }
 
 async function main(): Promise<void> {
-  const config = loadConfig();
-  console.log(`目标调度中心: ${config.baseUrl}，用户: ${config.username}`);
+  const system = process.argv[2] ?? "order";
+  const env = process.argv[3] ?? "dev";
 
-  const client = new XxlJobClient(config);
+  const { config, path } = loadConfigFromDefaultPath();
+  console.log(`配置文件: ${path}`);
+
+  const sys = config.systems[system];
+  if (!sys) {
+    throw new Error(`未知系统 "${system}"，可用: ${Object.keys(config.systems).join(", ")}`);
+  }
+  const envCfg = sys.instances[env];
+  if (!envCfg) {
+    throw new Error(`未知环境 "${env}"（系统 ${system} 下可用: ${Object.keys(sys.instances).join(", ")}）`);
+  }
+
+  console.log(`目标: ${system}/${env} -> ${envCfg.url}（用户 ${envCfg.username}）`);
+  const client = new XxlJobClient({
+    baseUrl: envCfg.url,
+    username: envCfg.username,
+    password: envCfg.password,
+    timeoutMs: envCfg.timeoutMs,
+  });
 
   step("1. 登录");
   await client.login();

@@ -250,6 +250,17 @@ export async function startMockAdmin(username = VALID_USER, password = VALID_PAS
         return;
       }
 
+      if (path === "/jobinfo/remove" && req.method === "POST") {
+        const id = Number(param("id"));
+        if (!jobs.has(id)) {
+          json(returnT(null, "任务不存在", 500));
+          return;
+        }
+        jobs.delete(id);
+        json(returnT(null));
+        return;
+      }
+
       if (path === "/jobinfo/trigger" && req.method === "POST") {
         const job = jobs.get(Number(param("id")));
         if (!job) return json(returnT(null, "任务不存在", 500));
