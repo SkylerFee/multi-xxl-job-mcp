@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import { XxlJobClient, XxlJobApiError } from "./client.js";
+import { runInit } from "./cli.js";
 import { loadConfigFromDefaultPath } from "./config.js";
 import { TargetError, TargetRegistry } from "./registry.js";
 import {
@@ -551,10 +552,30 @@ function isMainModule(): boolean {
   return entryHref === import.meta.url;
 }
 
-// 直接运行时启动 stdio 服务
+/**
+ * 处理 init 子命令：交互式生成配置文件。
+ *
+ * 用户主动取消（拒绝覆盖）时仍以非零退出码结束：调用方常写成 "init && start"，
+ * 此时磁盘上没有新配置，用非零码让脚本立即停下，而不是带着旧配置继续跑。
+ */
+async function runInitCommand(): Promise<void> {
+  const result = await runInit();
+  if (result.status === "aborted") {
+    process.exitCode = 1;
+  }
+}
+
+// 直接运行时按子命令分发：init 走配置生成，其余启动 stdio 服务
 if (isMainModule()) {
-  main().catch((e) => {
-    console.error(`[${SERVER_NAME}] 启动失败: ${e instanceof Error ? e.message : e}`);
-    process.exit(1);
-  });
+  if (process.argv[2] === "init") {
+    runInitCommand().catch((e) => {
+      console.error(`[${SERVER_NAME}] init 失败: ${e instanceof Error ? e.message : e}`);
+      process.exit(1);
+    });
+  } else {
+    main().catch((e) => {
+      console.error(`[${SERVER_NAME}] 启动失败: ${e instanceof Error ? e.message : e}`);
+      process.exit(1);
+    });
+  }
 }
