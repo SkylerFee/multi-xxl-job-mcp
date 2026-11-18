@@ -359,7 +359,7 @@ export function loadConfigFromDefaultPath(
   const path = resolveConfigPath(platform, env, home);
   return { config: loadConfigFile(path, options), path };
 }
-/** @deprecated 单实例时代的连接配置。由 EnvConfig 取代，将在工具层改造（#14/#15）完成后删除。 */
+/** 客户端构造所需的连接配置：EnvConfig 经字段映射（url -> baseUrl）后的形态 */
 export interface XxlJobConfig {
   /** 调度中心地址，如 http://127.0.0.1:8080/xxl-job-admin（不带末尾斜杠） */
   baseUrl: string;
@@ -369,44 +369,4 @@ export interface XxlJobConfig {
   password: string;
   /** HTTP 超时（毫秒） */
   timeoutMs: number;
-}
-
-/**
- * @deprecated 从旧环境变量读取单实例配置。工具层改造完成后删除。
- *
- * 保留它是为了让 #12 这张票能独立合入而 CI 保持绿色（expand-contract 的 expand 阶段）；
- * 真正的移除发生在 #14/#15 把工具层切到 TargetRegistry 之后。
- */
-export function loadConfig(env: Record<string, string | undefined> = process.env): XxlJobConfig {
-  const baseUrl = env.XXL_JOB_URL;
-  const username = env.XXL_JOB_USERNAME;
-  const password = env.XXL_JOB_PASSWORD;
-
-  const missing: string[] = [];
-  if (!baseUrl) missing.push("XXL_JOB_URL");
-  if (!username) missing.push("XXL_JOB_USERNAME");
-  if (!password) missing.push("XXL_JOB_PASSWORD");
-  if (missing.length > 0) {
-    throw new Error(
-      "缺少必需的环境变量: " + missing.join(", ") + "。" +
-        "请在 MCP 客户端配置中设置，例如 XXL_JOB_URL=http://127.0.0.1:8080/xxl-job-admin",
-    );
-  }
-
-  const timeoutRaw = env.XXL_JOB_TIMEOUT_MS;
-  let timeoutMs = 15000;
-  if (timeoutRaw) {
-    const parsed = Number(timeoutRaw);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new Error("XXL_JOB_TIMEOUT_MS 必须是正整数（毫秒），当前值: " + timeoutRaw);
-    }
-    timeoutMs = parsed;
-  }
-
-  return {
-    baseUrl: baseUrl!.replace(/\/+$/, ""),
-    username: username!,
-    password: password!,
-    timeoutMs,
-  };
 }
