@@ -235,6 +235,10 @@ npm install
 # 编译
 npm run build
 
+# 代码检查（ESLint，规则见 eslint.config.js）
+# 注意：ESLint 10 要求 Node >= 20.19，仅影响开发者；运行时下限仍是 18.15
+npm run lint
+
 # 运行
 npm start
 
@@ -245,6 +249,10 @@ npm run dev
 ### 测试
 
 ```bash
+# 一次跑完所有离线测试（自动遍历 package.json 里的 test:* 脚本，跳过需真实 Admin 的 test:client）
+npm test
+
+# 也可以单独跑：
 # 冒烟测试（不需要 XXL-JOB，校验工具注册）
 npm run smoke
 
@@ -288,6 +296,9 @@ multi-xxl-job-mcp/
 │   ├── ARCHITECTURE.md   # 架构与功能逻辑
 │   ├── specs/            # 技术方案
 │   └── adr/              # 架构决策记录
+├── scripts/
+│   └── test-all.mjs      # 串行跑尽 package.json 里所有 test:* 脚本
+├── eslint.config.js      # ESLint flat config
 ├── config.example.yaml   # 配置文件示例
 ├── package.json
 └── tsconfig.json

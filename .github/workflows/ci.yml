@@ -69,6 +69,27 @@ jobs:
       - name: Integration test (自带 Mock Admin)
         run: npm run test:integration
 
+  lint:
+    # 单独成 job：lint 结果与 Node 版本无关，放进 matrix 会被重复执行 5 次。
+    # 它也独立于构建产物，只要源码可解析就能跑。
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint (ESLint flat config)
+        run: npm run lint
+
   package-check:
     name: 发布产物校验
     runs-on: ubuntu-latest

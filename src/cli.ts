@@ -351,7 +351,8 @@ export async function runInit(options: RunInitOptions = {}): Promise<InitResult>
     try {
       buildConfig(parseYaml(text), env, path);
     } catch (e) {
-      throw new Error("生成的配置未通过配置层校验，已放弃写入: " + errorMessage(e));
+      // cause 保留原始错误：message 里只有可读摘要，栈与字段细节留给上层排查
+      throw new Error("生成的配置未通过配置层校验，已放弃写入: " + errorMessage(e), { cause: e });
     }
 
     writeConfigFile(path, text);
@@ -360,7 +361,8 @@ export async function runInit(options: RunInitOptions = {}): Promise<InitResult>
     try {
       verifyConfigFile(path, env, options.platform ?? process.platform);
     } catch (e) {
-      throw new Error("写入后回读校验失败（" + path + "）: " + errorMessage(e));
+      // 同上：把磁盘回读失败的原始错误挂到 cause 上
+      throw new Error("写入后回读校验失败（" + path + "）: " + errorMessage(e), { cause: e });
     }
 
     const status: InitStatus = exists ? "overwritten" : "created";

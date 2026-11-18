@@ -8,25 +8,14 @@
 
 - 语言/运行时：TypeScript + Node.js >= 18.15（ESM，`module: NodeNext`）
 - 关键依赖：`@modelcontextprotocol/sdk`、`zod`
-- 源码：`src/server.ts`（13 个工具注册）、`src/registry.ts`（`(system,env)` → 客户端）、
-  `src/cli.ts`（init 子命令）、`src/client.ts`（Admin HTTP 客户端 + 登录 Cookie）、
-  `src/config.ts`（配置解析/插值/校验/平台路径）、`src/models.ts`（数据结构与校验）
-- 测试：4 个离线测试文件共 161 项断言 —— `config.test.ts`(31)、`registry.test.ts`(53)、
-  `cli.test.ts`(36)、`integration.ts`(41)；另有 `smoke.ts`(13 工具) 与
-  `test-client.ts`(需真实 Admin)、`mock-admin.ts`(Mock 服务器实现)
+- 源码各文件的职责见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「代码分层」一节
+- 测试：**入口以 `package.json` 的 `scripts` 为准**，分工见 ARCHITECTURE 的「测试怎么分工」一节。
+  文件清单、断言数量都不要再抄进来——它们随代码变化，抄进来就是下一个失真源
 
 ## 常用命令
 
-```bash
-npm install             # 依赖
-npm run build           # tsc -> dist/
-npm run smoke           # 13 个工具注册 + 双参数校验
-npm run test:config     # 配置解析层（纯函数）
-npm run test:registry   # 目标注册表（注入假客户端）
-npm run test:cli        # init 子命令
-npm run test:integration # 全链路，两个 Mock 目标，验证隔离
-npm run test:client      # 只读联调，需已生成配置 + 可达的真实 Admin
-```
+**命令以 `package.json` 的 `scripts` 为准，不在本文件重复列举**（重复一遍就多一处会失真的副本）。
+每个脚本做什么，用 `npm run` 不带参数即可列出。合并前的必跑项见下方「验证清单」。
 
 > **沙箱注意**：本机 npm 全局缓存在 `~/.npm`，在 workspace-write 沙箱下不可写，直接 `npm install`
 > 会报 `EPERM ... _cacache`。改用工作区内缓存：
@@ -50,7 +39,7 @@ git switch master && git pull
 git switch -c fix/unify-server-identity
 
 # 2-3. 开发并本地验证（脚本清单以 package.json 为准，见下方「验证清单」）
-npm run build && npm run smoke && npm test
+npm run build && npm run lint && npm run smoke && npm test
 
 # 4. 提 PR
 git push -u origin fix/unify-server-identity
@@ -79,6 +68,7 @@ gh pr merge <number> --squash --delete-branch
 
 ```bash
 npm run build   # 必须最先跑：其余脚本执行的都是 dist/ 产物
+npm run lint    # ESLint flat config，规则见 eslint.config.js。ESLint 10 要求 Node >= 20.19（仅开发侧）
 npm run smoke   # 工具注册完整性（不属于 test:* 命名空间，故单独列一行）
 npm test        # 串行跑尽 package.json 里所有 test:* 脚本（自动跳过需真实 Admin 的 test:client）
 ```
@@ -133,11 +123,13 @@ rm -rf "$TMPHOME"
 | 为什么某个地方要写得这么绕 | [docs/adr/](docs/adr/) |
 | issue 记在哪、标签怎么用 | [docs/agents/](docs/agents/) |
 
-**动手改代码之前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「已知脆弱点」一节**，那里列的 5 条是已验证的真实缺陷，别在不知情的情况下踩上去或重复「修复」。
+**动手改代码之前先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「已知脆弱点」一节**，
+那里每一条都是已验证的真实缺陷（含已修复的），别在不知情的情况下踩上去或重复「修复」。
 
 ## 代码导航（CodeGraph）
 
-本仓库已用 CodeGraph 建索引（`.codegraph/`，8 个文件 / 208 节点 / 492 边）。
+本仓库已用 CodeGraph 建索引（`.codegraph/`）。索引统计会随代码变化，
+**需要时用 `codegraph status` 现查，不要相信任何写在文档里的数字**。
 定位代码、理解调用关系时**优先**用它，而不是 grep/read 逐层翻：
 
 ```bash
