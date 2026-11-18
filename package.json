@@ -20,7 +20,8 @@
     "test:integration": "node dist/tests/integration.js",
     "test:client": "node dist/tests/test-client.js",
     "prepublishOnly": "npm run build && npm run smoke",
-    "test:config": "node dist/tests/config.test.js"
+    "test:config": "node dist/tests/config.test.js",
+    "test:registry": "node dist/tests/registry.test.js"
   },
   "engines": {
     "node": ">=18"

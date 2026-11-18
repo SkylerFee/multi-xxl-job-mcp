@@ -23,6 +23,13 @@ export interface EnvConfig {
   password: string;
   /** HTTP 超时（毫秒），默认 15000 */
   timeoutMs: number;
+  /**
+   * 该环境的 url / username / password 中是否有字段引用了 ${VAR} 环境变量。
+   *
+   * 解析后原始字符串已不可得，故在解析时就地标记，供 list_instances / describe 展示。
+   * 仅表示"用过插值"，不代表变量值来自何处；不参与寻址，也不影响客户端行为。
+   */
+  usesEnvVars?: boolean;
 }
 
 /** 单个系统：一个业务系统下的一组环境 */
@@ -40,6 +47,20 @@ export interface ConfigFile {
 
 /** 系统名与环境名的合法字符集（避免 YAML 键名与调用参数产生歧义） */
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/** 匹配 ${VAR} 形式的环境变量引用，用于判定某字段是否用了插值 */
+const ENV_VAR_REF_PATTERN = /\$\{[A-Za-z_][A-Za-z0-9_]*\}/;
+
+/**
+ * 判断某个原始字段值是否引用了 ${VAR} 环境变量。
+ *
+ * 只有字符串才可能带插值；YAML 把纯数字密码解析成 number 的情形必然不含变量。
+ *
+ * @param raw 插值前的原始值
+ */
+function hasEnvVarRef(raw: unknown): boolean {
+  return typeof raw === "string" && ENV_VAR_REF_PATTERN.test(raw);
+}
 
 /** 默认 HTTP 超时（毫秒） */
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -157,6 +178,10 @@ function parseEnvConfig(
   }
   const obj = raw as Record<string, unknown>;
 
+  // 插值前先记录"是否用过环境变量"，插值后原始字符串就丢了
+  const usesEnvVars =
+    hasEnvVarRef(obj.url) || hasEnvVarRef(obj.username) || hasEnvVarRef(obj.password);
+
   const url = interpolate(requireString(obj.url, path + ".url"), env, path + ".url").replace(/\/+$/, "");
   const username = interpolate(requireString(obj.username, path + ".username"), env, path + ".username");
   if (username.trim() === "") {
@@ -178,7 +203,7 @@ function parseEnvConfig(
     timeoutMs = n;
   }
 
-  return { url, username, password, timeoutMs };
+  return { url, username, password, timeoutMs, usesEnvVars };
 }
 
 /**
