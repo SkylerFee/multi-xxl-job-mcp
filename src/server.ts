@@ -40,6 +40,25 @@ function ok(data: unknown, note?: string): ToolResult {
 }
 
 /**
+ * 把执行结果码翻译成中文描述。
+ *
+ * 取值来自上游 XxlJobContext：
+ * - 成功码：标准版 1、部分二开版 200
+ * - 失败码：0（未执行）/ 2（执行器未回调）/ 500（HANDLE_CODE_FAIL）
+ * - 502（HANDLE_CODE_TIMEOUT）：执行超时，**必须与「未完成」区分**
+ *   —— 超时是已经结束的失败，而「未完成」表示仍在执行中，
+ *   混为一谈会把人引向「再等等」而不是「去查超时原因」
+ *
+ * @param handleCode 日志记录中的执行结果码
+ */
+function handleResultText(handleCode: number): string {
+  if (handleCode === 1 || handleCode === 200) return "执行成功";
+  if (handleCode === 502) return "执行超时";
+  if (handleCode === 0 || handleCode === 2 || handleCode === 500) return "执行失败";
+  return "未完成";
+}
+
+/**
  * 把任意异常转为工具错误结果。
  *
  * 目标寻址失败（未知 system/env）是参数问题而非服务故障，
@@ -470,12 +489,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
             ...l,
             // 兼容不同版本的成功码：标准版 1=成功，部分版本 200=成功
             triggerResult: l.triggerCode === 1 || l.triggerCode === 200 ? "调度成功" : "调度失败",
-            handleResult:
-              l.handleCode === 1 || l.handleCode === 200
-                ? "执行成功"
-                : l.handleCode === 0 || l.handleCode === 2 || l.handleCode === 500
-                  ? "执行失败"
-                  : "未完成",
+            handleResult: handleResultText(l.handleCode),
           })),
         });
       } catch (e) {

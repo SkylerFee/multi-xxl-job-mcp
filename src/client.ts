@@ -116,7 +116,30 @@ export class XxlJobClient {
     return resp;
   }
 
-  /** 判断响应是否为"未登录"（302 跳登录页 或 返回 HTML 登录页） */
+  /** 已读取的响应体缓存。fetch 的 body 是一次性流，读过再读会抛 "Body is unusable" */
+  private readonly bodyCache = new WeakMap<Response, Promise<string>>();
+
+  /**
+   * 读取响应体全文，同一响应只真正消费一次。
+   *
+   * `isAuthRedirect()` 与 `parseReturnT()` 都要看内容，二者共享这份缓存，
+   * 否则第二个读的人会拿到 `TypeError: Body is unusable`。
+   *
+   * @param resp fetch 返回的响应
+   */
+  private readBody(resp: Response): Promise<string> {
+    const cached = this.bodyCache.get(resp);
+    if (cached !== undefined) return cached;
+    const pending = resp.text();
+    this.bodyCache.set(resp, pending);
+    return pending;
+  }
+
+  /**
+   * 判断响应是否为「未登录」：302 跳登录页，或直接返回登录页 HTML。
+   *
+   * 第二个分支需要读 body 才能判断，读到的内容会进缓存供 parseReturnT 复用。
+   */
   private async isAuthRedirect(resp: Response): Promise<boolean> {
     if ([301, 302, 303, 307, 308].includes(resp.status)) {
       const location = resp.headers.get("location") || "";
@@ -124,14 +147,20 @@ export class XxlJobClient {
     }
     const contentType = resp.headers.get("content-type") || "";
     if (contentType.includes("text/html")) {
-      const text = (await resp.text()).slice(0, 500);
+      const text = (await this.readBody(resp)).slice(0, 500);
       return /login/i.test(text);
     }
     return false;
   }
 
+  /**
+   * 解析响应为 JSON。
+   *
+   * @param resp fetch 返回的响应
+   * @param path 请求路径，用于错误信息
+   */
   private async parseReturnT(resp: Response, path: string): Promise<unknown> {
-    const text = await resp.text();
+    const text = await this.readBody(resp);
     try {
       return JSON.parse(text);
     } catch {
@@ -317,18 +346,19 @@ export class XxlJobClient {
     await this.request("POST", "/jobinfo/remove", { id });
   }
 
-  /** 手动触发一次执行 */
+  /**
+   * 手动触发一次执行。
+   *
+   * 只触发执行，不影响 triggerStatus。返回体由 request() 统一按 ReturnT 处理，
+   * code 非 200 已在那一层抛错，此处无需重复判断。
+   */
   async triggerJob(id: number, executorParam?: string, addressList?: string): Promise<void> {
     // trigger 接口要求 executorParam 和 addressList 始终存在（可为空字符串）
-    const result = await this.request("POST", "/jobinfo/trigger", {
+    await this.request("POST", "/jobinfo/trigger", {
       id,
       executorParam: executorParam ?? "",
       addressList: addressList ?? "",
     });
-    // 检查返回码（trigger 接口成功时 code 可能为 200 或其他）
-    if (result.code !== undefined && result.code !== 200) {
-      throw new XxlJobApiError(result.msg || `接口 /jobinfo/trigger 返回错误`, result.code, "/jobinfo/trigger");
-    }
   }
 
   /** 预演未来触发时间（Admin 默认返回未来 5 次） */
