@@ -28,7 +28,7 @@
     "test:regression": "node dist/tests/regression.test.js"
   },
   "engines": {
-    "node": ">=18.15"
+    "node": ">=26"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

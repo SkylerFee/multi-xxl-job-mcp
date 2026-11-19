@@ -6,7 +6,8 @@
 
 `multi-xxl-job-mcp` —— 通过 MCP 协议（stdio 传输）让 AI 助手管理 XXL-JOB 调度中心的 MCP Server。fork 自 `shaguocgl/mcp-xxl-job`，现独立维护。
 
-- 语言/运行时：TypeScript + Node.js >= 18.15（ESM，`module: NodeNext`）
+- 语言/运行时：TypeScript + Node.js >= 26（ESM，`module: NodeNext`）。版本基准见 `.node-version`，
+  不承诺向下兼容更低的 Node 版本
 - 关键依赖：`@modelcontextprotocol/sdk`、`zod`
 - 源码各文件的职责见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「代码分层」一节
 - 测试：**入口以 `package.json` 的 `scripts` 为准**，分工见 ARCHITECTURE 的「测试怎么分工」一节。
@@ -68,7 +69,7 @@ gh pr merge <number> --squash --delete-branch
 
 ```bash
 npm run build   # 必须最先跑：其余脚本执行的都是 dist/ 产物
-npm run lint    # ESLint flat config，规则见 eslint.config.js。ESLint 10 要求 Node >= 20.19（仅开发侧）
+npm run lint    # ESLint flat config，规则见 eslint.config.js。**仅本地执行，CI 不跑 lint**
 npm run smoke   # 工具注册完整性（不属于 test:* 命名空间，故单独列一行）
 npm test        # 串行跑尽 package.json 里所有 test:* 脚本（自动跳过需真实 Admin 的 test:client）
 ```

@@ -1,9 +1,11 @@
-# 持续集成：构建 + 冒烟测试 + 多版本兼容验证
+# 持续集成：构建 + 全部测试 + 发布产物校验
 #
 # 设计要点：
+# - 只跑与开发机一致的环境（ubuntu + 当前本地 Node 版本），不做多版本/多系统矩阵。
+#   项目不承诺向下兼容更低的 Node，版本基准以 .node-version 与 package.json 的 engines 为准。
 # - permissions 收窄到 contents: read，遵循最小权限原则
 # - 所有第三方 action 固定到完整 commit SHA，杜绝 tag 被移动导致的供应链攻击
-# - 并行跑 smoke 与 integration，两者都自带 Mock Admin，无需真实 XXL-JOB
+# - lint 不在 CI 中执行，由本地 npm run lint 负责（见 AGENTS.md 的验证清单）
 name: CI
 
 on:
@@ -22,19 +24,13 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Node ${{ matrix.node }} / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # 18.15.0 是下限（Headers.prototype.getSetCookie 自 18.15 起才有，缺失会导致登录态静默失效）。
-        # 只写 18 会解析到 18.x 最新，照不到下限，所以单独钉一格。
-        node: [18, 18.15.0, 20, 22]
-        include:
-          # 额外验证 macOS 上的 realpath 符号链接逻辑（server.ts 的入口判定依赖它）
-          - os: macos-latest
-            node: 22
+        # 单一版本，与 .node-version 保持一致。改这里时同步改 .node-version 与 engines.node。
+        node: [26]
 
     steps:
       - name: Checkout
@@ -43,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.node }}
+          node-version-file: .node-version
           cache: npm
 
       - name: Install dependencies
@@ -72,27 +68,6 @@ jobs:
       - name: Integration test (自带 Mock Admin)
         run: npm run test:integration
 
-  lint:
-    # 单独成 job：lint 结果与 Node 版本无关，放进 matrix 会被重复执行 5 次。
-    # 它也独立于构建产物，只要源码可解析就能跑。
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Lint (ESLint flat config)
-        run: npm run lint
-
   package-check:
     name: 发布产物校验
     runs-on: ubuntu-latest
@@ -103,7 +78,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
 
       - name: Install dependencies
