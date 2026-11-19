@@ -14,6 +14,7 @@ import {
   interpolate,
   loadConfigFile,
   resolveConfigPath,
+  resolveLegacyConfigPath,
   ConfigError,
 } from "../src/config.js";
 
@@ -144,12 +145,20 @@ function main(): void {
     const brokenPath = writeTemp(dir, "broken.yaml", "systems: [unclosed", 0o600);
     expectConfigError("YAML 语法错误", () => loadConfigFile(brokenPath, {}), "解析失败");
 
-    console.log("[8] 跨平台路径");
+    console.log("[8] 统一配置路径（三平台同一规则）");
     const home = "/home/tester";
-    check("linux 默认 ~/.config", resolveConfigPath("linux", {}, home) === "/home/tester/.config/multi-xxl-job-mcp/config.yaml", resolveConfigPath("linux", {}, home));
+    const expected = "/home/tester/.config/multi-xxl-job-mcp/config.yaml";
+    check("linux 默认 ~/.config", resolveConfigPath("linux", {}, home) === expected, resolveConfigPath("linux", {}, home));
     check("linux 尊重 XDG_CONFIG_HOME", resolveConfigPath("linux", { XDG_CONFIG_HOME: "/xdg" }, home) === "/xdg/multi-xxl-job-mcp/config.yaml", resolveConfigPath("linux", { XDG_CONFIG_HOME: "/xdg" }, home));
-    check("darwin 用 Application Support", resolveConfigPath("darwin", {}, home) === "/home/tester/Library/Application Support/multi-xxl-job-mcp/config.yaml", resolveConfigPath("darwin", {}, home));
-    check("win32 用 APPDATA", resolveConfigPath("win32", { APPDATA: "C:/Users/t/AppData/Roaming" }, home).includes("multi-xxl-job-mcp"), resolveConfigPath("win32", { APPDATA: "C:/Users/t/AppData/Roaming" }, home));
+    check("darwin 与 linux 一致（不再用 Application Support）", resolveConfigPath("darwin", {}, home) === expected, resolveConfigPath("darwin", {}, home));
+    check("win32 与 linux 一致（不再用 APPDATA）", resolveConfigPath("win32", {}, home) === expected, resolveConfigPath("win32", {}, home));
+    check("darwin 也尊重 XDG_CONFIG_HOME", resolveConfigPath("darwin", { XDG_CONFIG_HOME: "/xdg" }, home) === "/xdg/multi-xxl-job-mcp/config.yaml", resolveConfigPath("darwin", { XDG_CONFIG_HOME: "/xdg" }, home));
+    check("三平台返回同一路径", new Set(["linux", "darwin", "win32"].map((p) => resolveConfigPath(p as NodeJS.Platform, {}, home))).size === 1);
+
+    console.log("[8.1] 旧路径迁移检测");
+    check("darwin 旧路径为 Application Support", resolveLegacyConfigPath("darwin", {}, home) === "/home/tester/Library/Application Support/multi-xxl-job-mcp/config.yaml", resolveLegacyConfigPath("darwin", {}, home));
+    check("win32 旧路径为 APPDATA", resolveLegacyConfigPath("win32", { APPDATA: "C:/Users/t/AppData/Roaming" }, home) === "C:/Users/t/AppData/Roaming/multi-xxl-job-mcp/config.yaml", resolveLegacyConfigPath("win32", { APPDATA: "C:/Users/t/AppData/Roaming" }, home));
+    check("linux 无需迁移（返回 null）", resolveLegacyConfigPath("linux", {}, home) === null, resolveLegacyConfigPath("linux", {}, home));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
