@@ -1,7 +1,7 @@
 # multi-xxl-job-mcp
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js >= 18.15](https://img.shields.io/badge/node-%3E%3D18.15-green.svg)](https://nodejs.org/)
+[![Node.js >= 26](https://img.shields.io/badge/node-%3E%3D26-green.svg)](https://nodejs.org/)
 
 MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MCP 协议让 AI 助手直接管理 XXL-JOB 定时任务。
 
@@ -42,8 +42,9 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 
 ## 环境要求
 
-- **Node.js** >= 18.15（低于 18.15 缺少 `Headers.prototype.getSetCookie`，登录会「成功」但存不下 Cookie，
-  之后每个请求都报「登录态失效」；详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的「已知脆弱点」）
+- **Node.js** >= 26（版本基准见 `.node-version`，与 CI 保持一致）
+  > 不承诺向下兼容更低的 Node 版本。历史上曾需要 >= 18.15（低于该版本缺少
+  > `Headers.prototype.getSetCookie`，登录会「成功」但存不下 Cookie），现在整体以当前开发版本为基线。
 - **XXL-JOB Admin** >= 2.3.0
 
 
@@ -241,8 +242,7 @@ npm install
 # 编译
 npm run build
 
-# 代码检查（ESLint，规则见 eslint.config.js）
-# 注意：ESLint 10 要求 Node >= 20.19，仅影响开发者；运行时下限仍是 18.15
+# 代码检查（ESLint，规则见 eslint.config.js；仅本地执行，CI 不跑）
 npm run lint
 
 # 运行
@@ -312,7 +312,7 @@ multi-xxl-job-mcp/
 
 ## 技术栈
 
-- **Runtime**: Node.js >= 18.15
+- **Runtime**: Node.js >= 26（见 `.node-version`）
 - **Language**: TypeScript
 - **MCP SDK**: @modelcontextprotocol/sdk
 - **Schema Validation**: Zod

@@ -188,7 +188,7 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 
 | # | 现象 | 位置 | 证据 | 影响 |
 |---|---|---|---|---|
-| 1 | ~~Node **< 18.15** 上登录「成功」但 Cookie 存不下，之后每个请求都报「登录态失效」~~ **已修复** | `client.ts:78` 的 `resp.headers.getSetCookie?.()` 在缺失时静默取空数组 | 在 Node 18.14.0 实跑集成测试：23 项断言大面积失败；18.15.0 起全部通过 | `package.json` 声明 engines.node >= 18，实际需要 **>= 18.15**。**修复方式**：`engines.node` 收紧为 `>=18.15`，CI matrix 增加 `18.15.0` 一格以照住下限（只写 `18` 会解析到 18.x 最新，测不到下限） |
+| 1 | ~~Node **< 18.15** 上登录「成功」但 Cookie 存不下，之后每个请求都报「登录态失效」~~ **已修复** | `client.ts:78` 的 `resp.headers.getSetCookie?.()` 在缺失时静默取空数组 | 在 Node 18.14.0 实跑集成测试：23 项断言大面积失败；18.15.0 起全部通过 | `package.json` 声明 engines.node >= 18，实际需要 **>= 18.15**。**修复方式**：`engines.node` 收紧为 `>=18.15`，CI matrix 增加 `18.15.0` 一格以照住下限（只写 `18` 会解析到 18.x 最新，测不到下限）。**后续变更**：项目已确定只以当前开发版本为基线、不再承诺向下兼容，`engines.node` 现为 `>=26`，CI 收敛为单一 Node 版本（读 `.node-version`），上述多版本 matrix 已移除 |
 | 2 | ~~HTML 响应抛 `TypeError: Body is unusable`~~ **已修复** | 根因是 `isAuthRedirect()` 先消费了响应体，`parseReturnT()` 再读一次 | 回归测试 `test:regression` 覆盖：网关错误页现在抛可读的 `XxlJobApiError`，并附带响应片段 | 修复方式：响应体统一走带缓存的 `readBody()`，同一响应只消费一次 |
 | 3 | ~~handleCode=502 被显示成「未完成」~~ **已修复** | 上游 `XxlJobContext.HANDLE_CODE_TIMEOUT = 502` | 回归测试覆盖 0/1/2/200/500/502 六个状态码的映射 | 修复方式：抽出 `handleResultText()`，502 单独显示为「执行超时」——超时是已结束的失败，与「仍在执行」必须区分 |
 | 4 | ~~`remove_job` 没有任何测试~~ **已修复** | 根因是 `tests/mock-admin.ts` 从未实现 `/jobinfo/remove` 端点 | 多系统改造中补上该端点，`remove_job` 现由集成测试端到端覆盖 | — |
