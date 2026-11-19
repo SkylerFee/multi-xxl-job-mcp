@@ -206,11 +206,32 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 | `npm run test:integration` | 无（自带两个 Mock Admin） | 全链路 41 项，含目标隔离、未知目标无副作用、remove_job 端到端 |
 | `npm run test:client` | 真实 Admin + 已生成的配置 | 只读联调：登录、查组、查任务、查日志正文 |
 
-**共 4 个离线测试文件、161 项断言**，除 `test:client` 外全部不需要网络。
+**共 5 个离线测试文件、174 项断言**，除 `test:client` 外全部不需要网络。
 
 `tests/mock-admin.ts` 是这套测试能「零依赖」的关键：它按真实 Admin 的语义实现了登录、302 拦截、ReturnT 与裸分页两种响应形状，并在随机端口启动——**起两个即为两个独立目标**，集成测试正是这样验证目标隔离的。
 
 > 教训：`remove_job` 长期没有测试，不是「忘了写」，而是 mock 里根本没有 `/jobinfo/remove` 端点，无从测起。**改 client 时如果新增接口，要在 mock 里补对应端点**，否则测试会静默漏掉整条路径。
+
+## CI 运维：macOS runner 偶发排队取消
+
+macOS 那一格偶尔会以**红灯**收场，但**代码没问题**。判断标准只有两条，都成立即为基础设施问题：
+
+1. `conclusion` 是 `cancelled`（不是 `failure`）
+2. `runner_name` 为空，或 job 在 `queued` 状态停留十几分钟
+
+原因：GitHub 托管 macOS runner 的并发池很小，高峰期要排队；超过约 15 分钟未分配就会被取消。此时 job **从未执行过任何测试**，红灯不代表代码有问题。
+
+**处置：直接重跑，不要改代码、不要放宽门禁。**
+
+```bash
+# 查这个 job 到底是失败还是没跑起来
+gh api repos/<owner>/<repo>/actions/jobs/<job-id> \
+  --jq '{status, conclusion, runner_name, started_at, completed_at}'
+```
+
+对照：正常运行时 macOS job 约 **12–20 秒**结束；一旦耗时以「分钟」计且 `runner_name` 为空，就是排队。
+
+> 实测案例：本仓库曾连续两次因此变红（`runner_name` 均为空、排 15 分钟后 cancelled），第三次重跑 12 秒通过，代码一行未改。
 
 ## 读代码的建议顺序
 
