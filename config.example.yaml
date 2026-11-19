@@ -1,10 +1,9 @@
 # multi-xxl-job-mcp 配置文件示例
 #
-# 放置位置（程序按平台自动判定，用 "multi-xxl-job-mcp init" 可自动生成）：
-#   Linux:   $XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml
-#            （未设置 XDG_CONFIG_HOME 时为 ~/.config/multi-xxl-job-mcp/config.yaml）
-#   macOS:   ~/Library/Application Support/multi-xxl-job-mcp/config.yaml
-#   Windows: %APPDATA%\multi-xxl-job-mcp\config.yaml
+# 放置位置（三个平台统一，用 "multi-xxl-job-mcp init" 可自动生成）：
+#   $XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml
+#   未设置 XDG_CONFIG_HOME 时为 ~/.config/multi-xxl-job-mcp/config.yaml
+#   Windows 下 ~ 为 %USERPROFILE%
 #
 # 结构是两层：系统（systems）→ 环境（instances）。
 # 一个业务系统可以有任意多套环境，每套环境指向一个独立的 XXL-JOB 调度中心。

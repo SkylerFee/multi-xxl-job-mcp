@@ -40,7 +40,7 @@ cli.ts ──► config.ts   （init 只依赖配置层，不碰 client 与 regi
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `src/config.ts` | 解析 YAML/JSON 配置、`${VAR}` 插值、两层结构校验、平台路径判定 | `loadConfigFromDefaultPath()`、`resolveConfigPath()` |
+| `src/config.ts` | 解析 YAML/JSON 配置、`${VAR}` 插值、两层结构校验、统一配置路径 | `loadConfigFromDefaultPath()`、`resolveConfigPath()` |
 | `src/registry.ts` | `(system, env)` → 懒创建并缓存的客户端 | `TargetRegistry.get()`、`list()`、`describe()` |
 | `src/cli.ts` | `init` 子命令，交互式生成配置 | `runInit()` |
 | `src/models.ts` | 与 Admin 对齐的数据结构、默认值、纯校验 | `JOB_DEFAULTS`、`validateSchedule()`、`pageTotal()` |
@@ -198,15 +198,15 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 
 | 命令 | 需要什么 | 覆盖什么 |
 |---|---|---|
-| `npm run test:config` | 无 | 配置解析 31 项：YAML/JSON、插值、结构校验、权限、三平台路径 |
+| `npm run test:config` | 无 | 配置解析 36 项：YAML/JSON、插值、结构校验、权限、统一路径与旧路径迁移 |
 | `npm run test:registry` | 无 | 注册表 53 项：同目标复用、跨目标隔离、未知目标错误、不泄漏密码 |
-| `npm run test:cli` | 无 | init 子命令 36 项：默认值、覆盖确认、EOF 中断、权限 600 |
+| `npm run test:cli` | 无 | init 子命令 37 项：默认值、覆盖确认、EOF 中断、权限 600 |
 | `npm run test:regression` | 无 | 已验证脆弱点的回归 13 项：HTML 响应只读一次、登录页识别、状态码映射 |
 | `npm run smoke` | 无 | 13 个工具注册 + 「所有操作类工具都要求 system/env」 |
 | `npm run test:integration` | 无（自带两个 Mock Admin） | 全链路 41 项，含目标隔离、未知目标无副作用、remove_job 端到端 |
 | `npm run test:client` | 真实 Admin + 已生成的配置 | 只读联调：登录、查组、查任务、查日志正文 |
 
-**共 5 个离线测试文件、174 项断言**，除 `test:client` 外全部不需要网络。
+**共 5 个离线测试文件、184 项断言**，除 `test:client` 外全部不需要网络。
 
 `tests/mock-admin.ts` 是这套测试能「零依赖」的关键：它按真实 Admin 的语义实现了登录、302 拦截、ReturnT 与裸分页两种响应形状，并在随机端口启动——**起两个即为两个独立目标**，集成测试正是这样验证目标隔离的。
 

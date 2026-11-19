@@ -70,11 +70,17 @@ multi-xxl-job-mcp init
 
 交互式生成到手头无需记忆的路径（各平台自动判定）：
 
-| 平台 | 路径 |
-|------|------|
-| Linux | `$XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml`，未设置则 `~/.config/...` |
-| macOS | `~/Library/Application Support/multi-xxl-job-mcp/config.yaml` |
-| Windows | `%APPDATA%\multi-xxl-job-mcp\config.yaml` |
+**三个平台使用同一路径**：
+
+```
+$XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml
+```
+
+未设置 `XDG_CONFIG_HOME` 时即 `~/.config/multi-xxl-job-mcp/config.yaml`（Windows 下 `~` 为 `%USERPROFILE%`）。
+
+不按平台分三套路径是刻意的：macOS 的 `Application Support` 是 GUI 应用惯例，命令行工具普遍不用它（`gh`、`opencode`、`redis-mcp` 都是 `~/.config`）。统一之后文档只写一条路径，跨平台排查时也能照着别人的路径去找。
+
+> **从旧版本升级**：早期 macOS 用 `~/Library/Application Support/`、Windows 用 `%APPDATA%`。首次启动若在新路径找不到配置，会打印旧文件位置与可直接执行的迁移命令。
 
 服务启动时会打印实际读取的绝对路径。完整示例见 [config.example.yaml](./config.example.yaml)。
 

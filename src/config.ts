@@ -10,7 +10,7 @@
 
 import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 /** 单个环境（某系统下的一套调度中心连接） */
@@ -44,6 +44,12 @@ export interface SystemConfig {
 export interface ConfigFile {
   systems: Record<string, SystemConfig>;
 }
+
+/** 配置目录名，三个平台统一使用 */
+const APP_DIR = "multi-xxl-job-mcp";
+
+/** 配置文件名 */
+const CONFIG_FILE_NAME = "config.yaml";
 
 /** 系统名与环境名的合法字符集（避免 YAML 键名与调用参数产生歧义） */
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -88,33 +94,31 @@ export class ConfigError extends Error {
 }
 
 /**
- * 按平台返回配置文件的标准路径。
+ * 返回配置文件的标准路径。
  *
- * 三个平台各自遵循原生惯例，用户无需记忆路径（用 init 子命令生成即可）：
- * - linux:  $XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml，未设置则 ~/.config/...
- * - darwin: ~/Library/Application Support/multi-xxl-job-mcp/config.yaml
- * - win32:  %APPDATA%\multi-xxl-job-mcp\config.yaml
+ * **三个平台使用同一条规则**：`$XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml`，
+ * 未设置 XDG_CONFIG_HOME 时为 `~/.config/multi-xxl-job-mcp/config.yaml`。
  *
- * @param platform process.platform 的值
- * @param env 环境变量表，用于读取 XDG_CONFIG_HOME / APPDATA
+ * 为什么不按平台各用原生惯例（macOS 的 Application Support、Windows 的 APPDATA）：
+ * 那会让同一份文档要写三套路径，用户跨平台时要重新记一遍，排查配置问题时
+ * 也无法照着别人的路径去找。命令行工具不遵守 Apple 的 GUI 惯例是常态
+ * （gh、opencode、redis-mcp 都用 ~/.config），本项目也一样。
+ *
+ * Windows 下 `~` 由 os.homedir() 解析为 %USERPROFILE%，路径形如
+ * C:\Users\<user>\.config\multi-xxl-job-mcp\config.yaml。
+ *
+ * @param _platform 保留参数以便调用方显式传平台，路径本身已不再依赖它
+ * @param env 环境变量表，用于读取 XDG_CONFIG_HOME
  * @param home 用户主目录，默认 os.homedir()；测试可注入
  */
 export function resolveConfigPath(
-  platform: NodeJS.Platform,
+  _platform: NodeJS.Platform,
   env: Record<string, string | undefined> = process.env,
   home: string = homedir(),
 ): string {
-  const appDir = "multi-xxl-job-mcp";
-  if (platform === "win32") {
-    const appData = env.APPDATA && env.APPDATA.trim() ? env.APPDATA : join(home, "AppData", "Roaming");
-    return join(appData, appDir, "config.yaml");
-  }
-  if (platform === "darwin") {
-    return join(home, "Library", "Application Support", appDir, "config.yaml");
-  }
   const xdg = env.XDG_CONFIG_HOME;
   const base = xdg && xdg.trim() ? xdg : join(home, ".config");
-  return join(base, appDir, "config.yaml");
+  return join(base, APP_DIR, CONFIG_FILE_NAME);
 }
 
 /**
@@ -287,6 +291,33 @@ export function buildConfig(
 }
 
 /**
+ * 旧版（按平台原生惯例）的配置文件路径。
+ *
+ * 仅用于在配置缺失时给出迁移提示：早期版本 macOS 用 Application Support、
+ * Windows 用 APPDATA。该函数不参与正常读取，只为帮用户把旧文件搬到新位置。
+ *
+ * @param platform 平台标识
+ * @param env 环境变量表
+ * @param home 用户主目录
+ * @returns 旧路径；Linux 路径本来就一致，返回 null 表示无需迁移
+ */
+export function resolveLegacyConfigPath(
+  platform: NodeJS.Platform,
+  env: Record<string, string | undefined> = process.env,
+  home: string = homedir(),
+): string | null {
+  if (platform === "darwin") {
+    return join(home, "Library", "Application Support", APP_DIR, CONFIG_FILE_NAME);
+  }
+  if (platform === "win32") {
+    const appData = env.APPDATA && env.APPDATA.trim() ? env.APPDATA : join(home, "AppData", "Roaming");
+    return join(appData, APP_DIR, CONFIG_FILE_NAME);
+  }
+  // linux 的路径没有变化，无需迁移
+  return null;
+}
+
+/**
  * 从文件加载并校验配置。
  *
  * 格式按扩展名判定：.json 走 JSON，其余按 YAML（YAML 是 JSON 超集）。
@@ -295,6 +326,31 @@ export function buildConfig(
  * @param path 配置文件绝对路径
  * @param options 附加选项
  */
+/**
+ * 为「配置文件不存在」构造补充提示：若旧版路径下存在配置文件，直接告诉用户怎么搬。
+ *
+ * 统一路径改造后，早期 mac/Windows 用户升级会突然读不到配置。
+ * 与其让他们自己猜，不如把旧路径与新路径都给出来。
+ *
+ * @param expectedPath 当前期望的配置路径
+ * @returns 追加到错误信息后的提示；没有可迁移的旧文件时返回空串
+ */
+function buildMissingConfigHint(expectedPath: string): string {
+  const legacy = resolveLegacyConfigPath(process.platform);
+  if (!legacy || legacy === expectedPath) return "";
+  try {
+    if (!statSync(legacy).isFile()) return "";
+  } catch {
+    return "";
+  }
+  return (
+    "\n检测到旧版配置文件: " + legacy +
+    "\n配置路径已统一为 " + expectedPath + "，请迁移:" +
+    "\n  mkdir -p \"" + dirname(expectedPath) + "\"" +
+    "\n  mv \"" + legacy + "\" \"" + expectedPath + "\""
+  );
+}
+
 export function loadConfigFile(path: string, options: LoadOptions = {}): ConfigFile {
   const env = options.env ?? process.env;
 
@@ -302,10 +358,7 @@ export function loadConfigFile(path: string, options: LoadOptions = {}): ConfigF
   try {
     stat = statSync(path);
   } catch {
-    throw new ConfigError(
-      '配置文件不存在: ' + path + '。请运行 "multi-xxl-job-mcp init" 生成，或手动创建',
-      path,
-    );
+    throw new ConfigError("配置文件不存在: " + path + buildMissingConfigHint(path), path);
   }
   if (!stat.isFile()) {
     throw new ConfigError("配置路径不是文件: " + path, path);

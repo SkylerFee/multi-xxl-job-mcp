@@ -173,7 +173,7 @@ async function main(): Promise<void> {
     check("重问时给出错误提示", p5.messages.some((m) => m.includes("不是合法的系统名")), p5.messages);
 
     // ----------------------------------------------------------------
-    console.log("[7] 默认路径由 resolveConfigPath 推导");
+    console.log("[7] 默认路径由 resolveConfigPath 推导（统一 XDG）");
     // ----------------------------------------------------------------
     const home = join(dir, "home");
     const p6 = new ScriptedPrompter(["", "", "", "", "pw"]);
@@ -214,14 +214,16 @@ async function main(): Promise<void> {
     check("异常时未创建文件", !existsSync(interruptedPath), interruptedPath);
 
     // ----------------------------------------------------------------
-    console.log("[10] win32 回读自检不因权限位失败");
+    console.log("[10] win32 回读自检不因权限位失败（路径已与 posix 统一）");
     // ----------------------------------------------------------------
     // Windows 无 POSIX 权限位，statSync 恒报 0o644 一类值；自检必须放行而不是判失败
+    // 路径已统一为 XDG 风格，win32 下 ~/.config 由 os.homedir() 解析（此处注入 home）
     const winHome = join(dir, "winhome");
     const p8 = new ScriptedPrompter(["", "", "", "", "pw"]);
-    await runInit({ prompter: p8, platform: "win32", env: { APPDATA: join(winHome, "AppData", "Roaming") }, home: winHome });
-    const winPath = resolveConfigPath("win32", { APPDATA: join(winHome, "AppData", "Roaming") }, winHome);
+    await runInit({ prompter: p8, platform: "win32", env: {}, home: winHome });
+    const winPath = resolveConfigPath("win32", {}, winHome);
     check("win32 路径下文件已生成", existsSync(winPath), winPath);
+    check("win32 路径为 ~/.config 而非 APPDATA", winPath.includes(join(".config", "multi-xxl-job-mcp")), winPath);
     check("win32 回读可解析", loadConfigFile(winPath, { env: {} }).systems[DEFAULT_SYSTEM_NAME] !== undefined);
   } finally {
     rmSync(dir, { recursive: true, force: true });
