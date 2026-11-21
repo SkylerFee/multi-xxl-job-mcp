@@ -10,7 +10,7 @@
 
 import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 /** 单个环境（某系统下的一套调度中心连接） */
@@ -290,67 +290,6 @@ export function buildConfig(
   return { systems };
 }
 
-/**
- * 旧版（按平台原生惯例）的配置文件路径。
- *
- * 仅用于在配置缺失时给出迁移提示：早期版本 macOS 用 Application Support、
- * Windows 用 APPDATA。该函数不参与正常读取，只为帮用户把旧文件搬到新位置。
- *
- * @param platform 平台标识
- * @param env 环境变量表
- * @param home 用户主目录
- * @returns 旧路径；Linux 路径本来就一致，返回 null 表示无需迁移
- */
-export function resolveLegacyConfigPath(
-  platform: NodeJS.Platform,
-  env: Record<string, string | undefined> = process.env,
-  home: string = homedir(),
-): string | null {
-  if (platform === "darwin") {
-    return join(home, "Library", "Application Support", APP_DIR, CONFIG_FILE_NAME);
-  }
-  if (platform === "win32") {
-    const appData = env.APPDATA && env.APPDATA.trim() ? env.APPDATA : join(home, "AppData", "Roaming");
-    return join(appData, APP_DIR, CONFIG_FILE_NAME);
-  }
-  // linux 的路径没有变化，无需迁移
-  return null;
-}
-
-/**
- * 从文件加载并校验配置。
- *
- * 格式按扩展名判定：.json 走 JSON，其余按 YAML（YAML 是 JSON 超集）。
- * 文件权限若允许组或其他用户读取，默认告警；strictPermissions 为 true 时拒绝。
- *
- * @param path 配置文件绝对路径
- * @param options 附加选项
- */
-/**
- * 为「配置文件不存在」构造补充提示：若旧版路径下存在配置文件，直接告诉用户怎么搬。
- *
- * 统一路径改造后，早期 mac/Windows 用户升级会突然读不到配置。
- * 与其让他们自己猜，不如把旧路径与新路径都给出来。
- *
- * @param expectedPath 当前期望的配置路径
- * @returns 追加到错误信息后的提示；没有可迁移的旧文件时返回空串
- */
-function buildMissingConfigHint(expectedPath: string): string {
-  const legacy = resolveLegacyConfigPath(process.platform);
-  if (!legacy || legacy === expectedPath) return "";
-  try {
-    if (!statSync(legacy).isFile()) return "";
-  } catch {
-    return "";
-  }
-  return (
-    "\n检测到旧版配置文件: " + legacy +
-    "\n配置路径已统一为 " + expectedPath + "，请迁移:" +
-    "\n  mkdir -p \"" + dirname(expectedPath) + "\"" +
-    "\n  mv \"" + legacy + "\" \"" + expectedPath + "\""
-  );
-}
-
 export function loadConfigFile(path: string, options: LoadOptions = {}): ConfigFile {
   const env = options.env ?? process.env;
 
@@ -358,7 +297,10 @@ export function loadConfigFile(path: string, options: LoadOptions = {}): ConfigF
   try {
     stat = statSync(path);
   } catch {
-    throw new ConfigError("配置文件不存在: " + path + buildMissingConfigHint(path), path);
+    throw new ConfigError(
+      '配置文件不存在: ' + path + '。请运行 "multi-xxl-job-mcp init" 生成，或手动创建',
+      path,
+    );
   }
   if (!stat.isFile()) {
     throw new ConfigError("配置路径不是文件: " + path, path);

@@ -81,7 +81,6 @@ $XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml
 
 不按平台分三套路径是刻意的：macOS 的 `Application Support` 是 GUI 应用惯例，命令行工具普遍不用它（`gh`、`opencode`、`redis-mcp` 都是 `~/.config`）。统一之后文档只写一条路径，跨平台排查时也能照着别人的路径去找。
 
-> **从旧版本升级**：早期 macOS 用 `~/Library/Application Support/`、Windows 用 `%APPDATA%`。首次启动若在新路径找不到配置，会打印旧文件位置与可直接执行的迁移命令。
 
 服务启动时会打印实际读取的绝对路径。完整示例见 [config.example.yaml](./config.example.yaml)。
 
@@ -116,29 +115,6 @@ systems:
 **命名规则**：`system` 与 `env` 键名只能包含字母、数字、下划线和连字符。
 
 **凭据安全**：任何字段值支持 `${VAR}` 环境变量插值。密码建议写成 `${MY_PASSWORD}` 并在 MCP 客户端的 `env` 里设置——这样配置文件本身不含明文。变量未设置时会直接报错，不会静默用空串登录。文件权限若为组或其他可读，启动时会告警。
-
-### 从旧版本迁移
-
-> **不兼容变更**：旧的 `XXL_JOB_URL` / `XXL_JOB_USERNAME` / `XXL_JOB_PASSWORD` / `XXL_JOB_TIMEOUT_MS` 环境变量**已废弃且不会被读取**。
-
-把它们改写成配置文件的一次性对应关系：
-
-```yaml
-# 原来：
-#   XXL_JOB_URL=http://127.0.0.1:8080/xxl-job-admin
-#   XXL_JOB_USERNAME=admin
-#   XXL_JOB_PASSWORD=123456
-# 现在：
-systems:
-  order:            # 系统名可自取
-    instances:
-      dev:          # 环境名可自取
-        url: http://127.0.0.1:8080/xxl-job-admin
-        username: admin
-        password: 123456
-```
-
-改完后，MCP 客户端配置里的 `env` 不再需要这三个变量。
 
 ### MCP 客户端配置
 
