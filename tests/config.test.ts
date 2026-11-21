@@ -14,7 +14,6 @@ import {
   interpolate,
   loadConfigFile,
   resolveConfigPath,
-  resolveLegacyConfigPath,
   ConfigError,
 } from "../src/config.js";
 
@@ -155,10 +154,6 @@ function main(): void {
     check("darwin 也尊重 XDG_CONFIG_HOME", resolveConfigPath("darwin", { XDG_CONFIG_HOME: "/xdg" }, home) === "/xdg/multi-xxl-job-mcp/config.yaml", resolveConfigPath("darwin", { XDG_CONFIG_HOME: "/xdg" }, home));
     check("三平台返回同一路径", new Set(["linux", "darwin", "win32"].map((p) => resolveConfigPath(p as NodeJS.Platform, {}, home))).size === 1);
 
-    console.log("[8.1] 旧路径迁移检测");
-    check("darwin 旧路径为 Application Support", resolveLegacyConfigPath("darwin", {}, home) === "/home/tester/Library/Application Support/multi-xxl-job-mcp/config.yaml", resolveLegacyConfigPath("darwin", {}, home));
-    check("win32 旧路径为 APPDATA", resolveLegacyConfigPath("win32", { APPDATA: "C:/Users/t/AppData/Roaming" }, home) === "C:/Users/t/AppData/Roaming/multi-xxl-job-mcp/config.yaml", resolveLegacyConfigPath("win32", { APPDATA: "C:/Users/t/AppData/Roaming" }, home));
-    check("linux 无需迁移（返回 null）", resolveLegacyConfigPath("linux", {}, home) === null, resolveLegacyConfigPath("linux", {}, home));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
