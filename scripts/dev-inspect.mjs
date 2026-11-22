@@ -25,22 +25,46 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const debugHome = join(repoRoot, "tmp", "dev-home");
 const serverEntry = join(repoRoot, "dist", "src", "server.js");
 
-/** 解析本脚本自己的参数；其余原样透传给 Inspector */
+/**
+ * Inspector 的模式 flag。它必须在**最前**（Inspector 自己的要求：
+ * "Mode flags must appear before app options"），否则会被当成 server 命令的一部分。
+ */
+const MODE_FLAGS = new Set(["--web", "--cli", "--tui"]);
+
+/**
+ * 解析本脚本自己的参数，并把 Inspector 的参数拆成三段。
+ *
+ * 为什么不能简单地「原样透传给 Inspector」：两个约束互相冲突，需要分开摆放。
+ *   1. 模式 flag（--cli / --tui / --web）必须排在所有其他参数**之前**；
+ *   2. server 启动命令（位置参数）必须排在**变长选项之前**——--tool-arg / --prompt-args /
+ *      --metadata 这类选项会一直吞掉后续 token，server 命令若在其后，会被当成某个
+ *      --tool-arg 的值，Inspector 报 “Invalid parameter format: /path/to/node”。
+ *
+ * 最终顺序：modeFlags → server 命令 → 其余选项。
+ *
+ * @returns {{ modeFlags: string[], rest: string[], realHome: boolean }} 三段参数与本脚本开关
+ */
 function parseArgs(argv) {
-  const passthrough = [];
+  const modeFlags = [];
+  const rest = [];
   let realHome = false;
+  let printArgs = false;
   for (const arg of argv) {
     if (arg === "--real-home") {
       realHome = true;
+    } else if (arg === "--print-args") {
+      printArgs = true;
+    } else if (MODE_FLAGS.has(arg)) {
+      modeFlags.push(arg);
     } else {
-      passthrough.push(arg);
+      rest.push(arg);
     }
   }
-  return { passthrough, realHome };
+  return { modeFlags, rest, realHome, printArgs };
 }
 
 async function main() {
-  const { passthrough, realHome } = parseArgs(process.argv.slice(2));
+  const { modeFlags, rest, realHome, printArgs } = parseArgs(process.argv.slice(2));
 
   if (!existsSync(serverEntry)) {
     console.error("[dev:inspect] 找不到 " + serverEntry);
@@ -72,9 +96,22 @@ async function main() {
   // 密钥，改用内存存储，既避免明文落盘，也免掉每次启动的一串警告。用户显式设置时不覆盖。
   env.MCP_INSPECTOR_SECRET_STORE = env.MCP_INSPECTOR_SECRET_STORE ?? "memory";
 
-  // Inspector 的位置参数才是「被测 server 的启动命令」，必须放在最后；
-  // 用户只需传 Inspector 的开关，server 入口由这里补齐。
-  const inspectorArgs = ["--yes", "@modelcontextprotocol/inspector", ...passthrough, process.execPath, serverEntry];
+  // 顺序：模式 flag 最前（Inspector 要求）→ server 命令（避免被变长选项吞掉）→ 其余选项
+  const inspectorArgs = [
+    "--yes",
+    "@modelcontextprotocol/inspector",
+    ...modeFlags,
+    process.execPath,
+    serverEntry,
+    ...rest,
+  ];
+
+  // --print-args：只打印最终参数，不真正启动 Inspector。
+  // 用于排查参数顺序问题，以及让测试能在不联网、不开端口的前提下断言顺序。
+  if (printArgs) {
+    console.log(inspectorArgs.join(" "));
+    return;
+  }
 
   console.error("[dev:inspect] 配置来源: " + (realHome ? "真实 HOME" : "tmp/dev-home"));
   console.error("[dev:inspect] 启动: npx " + inspectorArgs.slice(1).join(" "));

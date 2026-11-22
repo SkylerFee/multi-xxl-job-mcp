@@ -45,6 +45,42 @@ function buildFakeConfig() {
   };
 }
 
+/**
+ * 递归扫描所有工具的 inputSchema，找出 type 为数组的节点。
+ *
+ * 只认 "type 是数组" 这一种情况——它是最典型的跨客户端不兼容点；
+ * 其余结构差异（如 oneOf vs anyOf）各家都能接受，不在此处裁决。
+ *
+ * @returns 形如 "工具名: a.b.c -> ["number","string"]" 的描述，供失败时打印
+ */
+function collectTypeArrays(tools: { name: string; inputSchema?: unknown }[]): string[] {
+  const found: string[] = [];
+
+  /** 深度优先遍历，path 用于在报错里指明具体位置 */
+  const walk = (node: unknown, path: string): void => {
+    if (Array.isArray(node)) {
+      node.forEach((child, i) => walk(child, path + "[" + i + "]"));
+      return;
+    }
+    if (node === null || typeof node !== "object") return;
+
+    const obj = node as Record<string, unknown>;
+    if (Array.isArray(obj.type)) {
+      found.push(path + " -> " + JSON.stringify(obj.type));
+    }
+    for (const [key, value] of Object.entries(obj)) {
+      // 跳过 required / enum 这类本身就是字符串数组的字段，它们不是 type 声明
+      if (key === "required" || key === "enum") continue;
+      walk(value, path === "" ? key : path + "." + key);
+    }
+  };
+
+  for (const tool of tools) {
+    walk(tool.inputSchema, tool.name + ": inputSchema");
+  }
+  return found;
+}
+
 async function main(): Promise<void> {
   // 注册表在此只用于注册工具；静默 logger 避免污染测试输出
   const registry = new TargetRegistry(buildFakeConfig(), { logger: () => {} });
@@ -84,6 +120,22 @@ async function main(): Promise<void> {
     console.log("冒烟测试通过: 所有操作类工具都要求 system / env");
   } else {
     console.error(`冒烟测试失败: 以下工具缺少 system/env 必填参数: ${withoutTarget.map((t) => t.name).join(", ")}`);
+    process.exitCode = 1;
+  }
+
+  // 额外校验：schema 里不允许出现 type 数组（如 type: ["number","string"]）。
+  //
+  // 这种写法合法（JSON Schema draft-07 允许 type 为字符串数组），但把 tool schema 映射到
+  // 「单一 type」方言的客户端——典型是 Gemini function declarations 用的 OpenAPI 子集——
+  // 可能拒收整个工具，或静默丢掉那条约束。表现是「在 Inspector 里正常，换个客户端就不可用」，
+  // 极难排查，所以在这里直接拦住。要表达「多种类型」时改用 anyOf / oneOf。
+  const typeArrays = collectTypeArrays(tools);
+  if (typeArrays.length === 0) {
+    console.log("冒烟测试通过: 所有工具 schema 都不含 type 数组（跨客户端可移植）");
+  } else {
+    console.error("冒烟测试失败: 以下 schema 使用了 type 数组，部分客户端会拒收或丢约束：");
+    for (const item of typeArrays) console.error("  " + item);
+    console.error("  修法：改用 anyOf / oneOf，每个分支单一 type。");
     process.exitCode = 1;
   }
 
