@@ -228,6 +228,55 @@ npm start
 npm run dev
 ```
 
+### 本地调试（Mock + Inspector）
+
+三个脚手架脚本，覆盖「没有真实调度中心」时的全部调试需求。**都要求先 `npm run build`**。
+
+```bash
+# 1. 起一个 Mock XXL-JOB Admin（固定端口 18080，并发一份隔离的调试配置）
+npm run dev:mock
+npm run dev:mock -- --port 18081      # 换端口（18080 被占用时）
+npm run dev:mock -- --no-config       # 只起服务，不写配置文件
+```
+
+`dev:mock` 做两件事：
+
+- 在 `127.0.0.1:18080` 起 Mock Admin（账号 `admin` / `mock-pass`）
+- 往 `tmp/dev-home/.config/multi-xxl-job-mcp/config.yaml` 写一份配置，含 `demo/dev` 与 `demo/prod`
+  **两个环境指向同一个 Mock**——这样能验证「同目标复用、跨目标隔离」这条主线；单环境看不出。
+
+> 配置文件写在 `tmp/dev-home/`（已被 `.gitignore` 覆盖），**不会碰你真实的 `~/.config`**。
+
+```bash
+# 2. 用官方 MCP Inspector 调试（另开一个终端）
+npm run dev:inspect                                        # Web UI，自动开浏览器
+npm run dev:inspect -- --tui                               # 终端交互界面
+npm run dev:inspect -- --cli --method tools/list           # 列出全部工具与 schema
+npm run dev:inspect -- --cli --method tools/call --tool-name list_instances
+npm run dev:inspect -- --cli --method tools/call --tool-name list_jobs \
+  --tool-arg system=demo --tool-arg env=dev --tool-arg page=1 --tool-arg pageSize=5
+
+# 3. 对 Mock 跑只读联调（等价 test:client，但不用手动设 HOME）
+npm run dev:client                    # demo/dev
+npm run dev:client -- demo prod       # 指定 system env
+```
+
+`dev:inspect` 与 `dev:client` 默认读 `tmp/dev-home` 的配置，与 `dev:mock` 保持一致。
+要连真实调度中心时加 `--real-home`，它们就会读你 `~/.config` 里的配置：
+
+```bash
+npm run dev:inspect -- --real-home
+npm run dev:client -- --real-home
+```
+
+**为什么 Inspector 不进 devDependencies**：它是调试便利工具，`npx` 按需拉取即可。
+装进依赖会让 `node_modules` 多出一大坨、拉长 `npm ci`，而它对运行和测试都没有必要。
+脚本里已把 `npm_config_cache` 指到 `tmp/npm-cache`，沙箱下也能正常拉包。
+
+> **断点调试**：`node --inspect-brk dist/src/server.js`，然后 Chrome 打开 `chrome://inspect` attach。
+> 改代码时另开一个终端跑 `npm run dev`（`tsc --watch`）。
+> ⚠️ stdio 模式下 **stdout 是 JSON-RPC 协议通道**，调试输出只能走 `console.error`，否则会污染协议流。
+
 ### 测试
 
 ```bash
@@ -246,6 +295,9 @@ npm run test:registry
 
 # init 子命令单元测试
 npm run test:cli
+
+# 本地调试脚手架的测试（固定端口、参数校验）
+npm run test:dev
 
 # 全链路集成测试（两个 Mock 目标，验证目标隔离）
 npm run test:integration
@@ -273,13 +325,18 @@ multi-xxl-job-mcp/
 │   ├── smoke.ts          # 冒烟测试（工具注册 + 双参数校验）
 │   ├── integration.ts    # 集成测试（两个 Mock 目标）
 │   ├── test-client.ts    # 真实环境只读联调
+│   ├── regression.test.ts   # 已修复脆弱点的回归测试
+│   ├── dev-scaffold.test.ts # 本地调试脚手架的测试
 │   └── mock-admin.ts     # Mock 服务器
 ├── docs/
 │   ├── ARCHITECTURE.md   # 架构与功能逻辑
 │   ├── specs/            # 技术方案
 │   └── adr/              # 架构决策记录
 ├── scripts/
-│   └── test-all.mjs      # 串行跑尽 package.json 里所有 test:* 脚本
+│   ├── test-all.mjs      # 串行跑尽 package.json 里所有 test:* 脚本
+│   ├── dev-mock.mjs      # 本地调试：起 Mock Admin + 写隔离配置
+│   ├── dev-inspect.mjs   # 本地调试：官方 MCP Inspector 的便捷入口
+│   └── dev-client.mjs    # 本地调试：对 Mock 跑只读联调
 ├── eslint.config.js      # ESLint flat config
 ├── config.example.yaml   # 配置文件示例
 ├── package.json

@@ -49,11 +49,25 @@ export interface MockAdminHandle {
   triggerCount: number;
 }
 
+/** startMockAdmin 的可选配置 */
+export interface MockAdminOptions {
+  /**
+   * 监听端口。
+   * - 省略或 0：由系统分配（测试用，两个 Mock 目标可以并行起而不撞端口）
+   * - 固定端口：本地调试脚手架用，便于把地址预先写进配置文件
+   */
+  port?: number;
+}
+
 function returnT(content: unknown, msg: string | null = null, code = 200) {
   return JSON.stringify({ code, msg, content });
 }
 
-export async function startMockAdmin(username = VALID_USER, password = VALID_PASS): Promise<MockAdminHandle> {
+export async function startMockAdmin(
+  username = VALID_USER,
+  password = VALID_PASS,
+  options: MockAdminOptions = {},
+): Promise<MockAdminHandle> {
   const groups = [
     { id: 1, appname: "xxl-job-executor-sample", title: "示例执行器", addressType: 0, addressList: null, updateTime: "2026-08-01 10:00:00" },
     { id: 2, appname: "order-executor", title: "订单执行器", addressType: 1, addressList: "http://127.0.0.1:9999/", updateTime: "2026-08-01 10:00:00" },
@@ -303,7 +317,16 @@ export async function startMockAdmin(username = VALID_USER, password = VALID_PAS
     });
   });
 
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  // 手动接管 error 事件：固定端口被占用时应该立刻抛出可读错误，
+  // 而不是让监听静默失败后卡在等待里。
+  await new Promise<void>((resolve, reject) => {
+    const onError = (err: Error) => reject(err);
+    server.once("error", onError);
+    server.listen(options.port ?? 0, "127.0.0.1", () => {
+      server.off("error", onError);
+      resolve();
+    });
+  });
   const port = (server.address() as AddressInfo).port;
 
   return {
