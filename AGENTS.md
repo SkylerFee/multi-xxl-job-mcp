@@ -80,6 +80,10 @@ npm test        # 串行跑尽 package.json 里所有 test:* 脚本（自动跳�
 
 改动涉及真实 Admin 行为时，再补跑 `npm run test:client`（需已生成的配置文件 + 可达的 Admin，只读）。
 
+没有真实调度中心时用 `dev:*` 脚手架（`npm run dev:mock` 起 Mock + 写隔离配置，`dev:inspect`
+接官方 MCP Inspector，`dev:client` 跑只读联调）。用法见 README 的「本地调试」一节——
+**那里也只写用法，不写死端口以外的实现细节**，改动脚本时同步更新那一节。
+
 改动涉及 MCP 握手标识、启动日志时，额外验证实际启动（用临时 HOME 隔离，避免读你真实配置）：
 
 ```bash

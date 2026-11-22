@@ -25,7 +25,11 @@
     "test:registry": "node dist/tests/registry.test.js",
     "test:cli": "node dist/tests/cli.test.js",
     "test": "node scripts/test-all.mjs",
-    "test:regression": "node dist/tests/regression.test.js"
+    "test:regression": "node dist/tests/regression.test.js",
+    "test:dev": "node dist/tests/dev-scaffold.test.js",
+    "dev:mock": "node scripts/dev-mock.mjs",
+    "dev:inspect": "node scripts/dev-inspect.mjs",
+    "dev:client": "node scripts/dev-client.mjs"
   },
   "engines": {
     "node": ">=26"
