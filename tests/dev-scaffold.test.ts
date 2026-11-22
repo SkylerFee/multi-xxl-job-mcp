@@ -105,6 +105,37 @@ async function main(): Promise<void> {
     check("dev-client 脚本文件存在", existsSync(join(repoRoot, "scripts", "dev-client.mjs")));
   }
 
+  console.log("\n[5b] dev-inspect 参数顺序（两个约束互相冲突，必须同时满足）");
+  {
+    // 通过 --print-args 让脚本只打印最终 npx 参数、不真的启动 Inspector（避免联网与开端口）。
+    const r = runScript("dev-inspect.mjs", [
+      "--print-args",
+      "--cli",
+      "--method", "tools/call",
+      "--tool-name", "list_jobs",
+      "--tool-arg", "system=demo",
+    ]);
+    check("--print-args 退出码为 0", r.code === 0, r.code);
+    const printed = r.out.trim();
+
+    // 约束 1：模式 flag 必须在 server 命令之前（Inspector 要求 "Mode flags must appear before app options"）
+    const cliIdx = printed.indexOf("--cli");
+    const serverIdx = printed.indexOf("src/server.js");
+    check(
+      "模式 flag 排在 server 命令之前",
+      cliIdx >= 0 && serverIdx >= 0 && cliIdx < serverIdx,
+      { cliIdx, serverIdx, printed },
+    );
+
+    // 约束 2：server 命令必须在变长选项 --tool-arg 之前，否则会被当成它的值
+    const toolArgIdx = printed.indexOf("--tool-arg");
+    check(
+      "server 命令排在 --tool-arg（变长选项）之前",
+      serverIdx >= 0 && toolArgIdx >= 0 && serverIdx < toolArgIdx,
+      { serverIdx, toolArgIdx, printed },
+    );
+  }
+
   console.log("\n[6] package.json 已注册三个 dev 脚本");
   {
     const pkgPath = join(repoRoot, "package.json");

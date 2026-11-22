@@ -261,6 +261,18 @@ npm run dev:client                    # demo/dev
 npm run dev:client -- demo prod       # 指定 system env
 ```
 
+`dev:inspect` 会自动把参数摆成 Inspector 要求的顺序，你只写自己的开关即可：
+
+- **模式 flag**（`--cli` / `--tui` / `--web`）排在最前 —— Inspector 的硬性要求
+- **server 启动命令**排在变长选项之前 —— `--tool-arg` 这类选项会一直吞掉后续 token，
+  server 命令若在其后将报 `Invalid parameter format: /path/to/node`
+
+排查参数问题时用 `--print-args` 只打印最终命令、不启动 Inspector：
+
+```bash
+npm run dev:inspect -- --print-args --cli --method tools/call --tool-name list_jobs --tool-arg system=demo
+```
+
 `dev:inspect` 与 `dev:client` 默认读 `tmp/dev-home` 的配置，与 `dev:mock` 保持一致。
 要连真实调度中心时加 `--real-home`，它们就会读你 `~/.config` 里的配置：
 
@@ -273,6 +285,10 @@ npm run dev:client -- --real-home
 装进依赖会让 `node_modules` 多出一大坨、拉长 `npm ci`，而它对运行和测试都没有必要。
 脚本里已把 `npm_config_cache` 指到 `tmp/npm-cache`，沙箱下也能正常拉包。
 
+> **schema 可移植性自检**：`npm run smoke` 会扫描所有工具的 inputSchema，拒绝 `type: ["number","string"]`
+> 这类数组写法。它合法但不可移植——把 tool schema 映射到单一 `type` 方言的客户端（如 Gemini
+> function declarations 用的 OpenAPI 子集）可能拒收整个工具或静默丢约束。需要多类型时用 `anyOf`。
+>
 > **断点调试**：`node --inspect-brk dist/src/server.js`，然后 Chrome 打开 `chrome://inspect` attach。
 > 改代码时另开一个终端跑 `npm run dev`（`tsc --watch`）。
 > ⚠️ stdio 模式下 **stdout 是 JSON-RPC 协议通道**，调试输出只能走 `console.error`，否则会污染协议流。

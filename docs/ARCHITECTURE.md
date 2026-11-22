@@ -193,6 +193,7 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 | 3 | ~~handleCode=502 被显示成「未完成」~~ **已修复** | 上游 `XxlJobContext.HANDLE_CODE_TIMEOUT = 502` | 回归测试覆盖 0/1/2/200/500/502 六个状态码的映射 | 修复方式：抽出 `handleResultText()`，502 单独显示为「执行超时」——超时是已结束的失败，与「仍在执行」必须区分 |
 | 4 | ~~`remove_job` 没有任何测试~~ **已修复** | 根因是 `tests/mock-admin.ts` 从未实现 `/jobinfo/remove` 端点 | 多系统改造中补上该端点，`remove_job` 现由集成测试端到端覆盖 | — |
 | 5 | ~~`trigger_job` 里的 code 检查是死代码~~ **已修复** | `request()` 已在返回前对非 200 抛错 | 回归测试验证 trigger 行为不变 | 删除冗余判断，减少读码噪声 |
+| 6 | ~~`get_job_log_content` 的 `triggerTime` 产出 `type: ["number","string"]`，部分客户端拒收整个工具~~ **已修复** | `server.ts` 的 `triggerTime: z.union([...])` —— zod 对基本类型 union 必然产出 type 数组 | MCP Inspector 的 `--strict` 可复现；smoke 现加了 type 数组扫描守卫 | **修复方式**：改为 `z.union([z.string(), z.int()])`，zod 因此输出 `anyOf`（每个分支单一 type），运行时接受范围不变（number / string 都收，对象等被拒） |
 
 ## 测试怎么分工
 
@@ -202,13 +203,15 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 | `npm run test:registry` | 无 | 注册表 53 项：同目标复用、跨目标隔离、未知目标错误、不泄漏密码 |
 | `npm run test:cli` | 无 | init 子命令 37 项：默认值、覆盖确认、EOF 中断、权限 600 |
 | `npm run test:regression` | 无 | 已验证脆弱点的回归 13 项：HTML 响应只读一次、登录页识别、状态码映射 |
+| `npm run test:dev` | 无 | 调试脚手架 23 项：固定端口、端口冲突、参数校验与顺序 |
 | `npm run smoke` | 无 | 13 个工具注册 + 「所有操作类工具都要求 system/env」 |
 | `npm run test:integration` | 无（自带两个 Mock Admin） | 全链路 41 项，含目标隔离、未知目标无副作用、remove_job 端到端 |
 | `npm run test:client` | 真实 Admin + 已生成的配置 | 只读联调：登录、查组、查任务、查日志正文 |
 
-**共 5 个离线测试文件、181 项断言**，除 `test:client` 外全部不需要网络。
+除 `test:client` 外全部不需要网络。**文件数与断言数以 `package.json` 的脚本和实际输出为准**，
+不在这里写死——上面这张表本身也只是分工说明，别当成计数依据。
 
-`tests/mock-admin.ts` 是这套测试能「零依赖」的关键：它按真实 Admin 的语义实现了登录、302 拦截、ReturnT 与裸分页两种响应形状，并在随机端口启动——**起两个即为两个独立目标**，集成测试正是这样验证目标隔离的。
+`tests/mock-admin.ts` 是这套测试能「零依赖」的关键：它按真实 Admin 的语义实现了登录、302 拦截、ReturnT 与裸分页两种响应形状，启动端口默认随机（`0`），也可传 `port` 固定——**起两个即为两个独立目标**，集成测试正是这样验证目标隔离的。
 
 > 教训：`remove_job` 长期没有测试，不是「忘了写」，而是 mock 里根本没有 `/jobinfo/remove` 端点，无从测起。**改 client 时如果新增接口，要在 mock 里补对应端点**，否则测试会静默漏掉整条路径。
 

@@ -509,7 +509,12 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
         ...targetSchema,
         logId: z.number().int().describe("执行日志记录 id（list_job_logs 返回的 id）"),
         executorAddress: z.string().describe("执行器地址（list_job_logs 返回的 executorAddress）"),
-        triggerTime: z.union([z.number(), z.string()]).describe("触发时间（list_job_logs 返回的 triggerTime 原值）"),
+        // 刻意用 z.union([z.string(), z.int()]) 而不是 z.union([z.number(), z.string()])：
+        // 后者的 JSON Schema 会产出 type: ["number","string"] 这种数组形式，虽然合法，
+        // 但把 tool schema 映射到「单一 type」方言的客户端（如 Gemini function declarations
+        // 用的 OpenAPI 子集）可能拒收整个工具或静默丢掉约束。
+        // 写法顺序（string 在前）决定 zod 输出 anyOf 而非 type 数组，运行时接受的范围不变。
+        triggerTime: z.union([z.string(), z.int()]).describe("触发时间（list_job_logs 返回的 triggerTime 原值）"),
         fromLineNum: z.number().int().min(1).default(1).describe("起始行号，首次传 1，续读传上次 toLineNum+1"),
       },
     },
