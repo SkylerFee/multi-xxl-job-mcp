@@ -98,7 +98,9 @@ jobs:
           node --input-type=module -e '
             import { execFileSync } from "node:child_process";
             import { assertPackageEntries } from "./scripts/release-policy.mjs";
-            const entries = execFileSync("tar", ["-tzf", process.argv[1]], { encoding: "utf8" }).trim().split("\\n");
+            // 用正则而非字符串转义：YAML -> shell -> JS 的转义层数容易出错，
+            // 之前写成 split("\\\\n") 会让字面反斜杠+n 成为分隔符，导致整段输出成一个条目。
+            const entries = execFileSync("tar", ["-tzf", process.argv[1]], { encoding: "utf8" }).trim().split(/\r?\n/);
             assertPackageEntries(entries);
             console.log("发布白名单校验通过，文件数:", entries.length);
           ' "$TARBALL"
