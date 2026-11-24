@@ -109,8 +109,8 @@ async function main() {
     // 清掉可能存在的 XDG_CONFIG_HOME，否则它会盖过 HOME
     delete env.XDG_CONFIG_HOME;
   }
-  // npx 的包缓存在沙箱下不可写，指向仓库内缓存
-  env.npm_config_cache = join(repoRoot, "tmp", "npm-cache");
+  // 不覆盖 npm 缓存：用本机默认（~/.npm）即可。npx 拉到的是常用包，
+  // 走本机缓存才有复用价值；指向仓库内目录反而每次都是冷启动。
   // Inspector 默认把密钥写进文件（无 OS keychain 时是明文）。调试场景没有需要长期保存的
   // 密钥，改用内存存储，既避免明文落盘，也免掉每次启动的一串警告。用户显式设置时不覆盖。
   env.MCP_INSPECTOR_SECRET_STORE = env.MCP_INSPECTOR_SECRET_STORE ?? "memory";

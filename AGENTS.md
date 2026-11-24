@@ -20,9 +20,9 @@ npm 包名：**`@skylerfee/multi-xxl-job-mcp`**（发布流程见 [docs/RELEASIN
 **命令以 `package.json` 的 `scripts` 为准，不在本文件重复列举**（重复一遍就多一处会失真的副本）。
 每个脚本做什么，用 `npm run` 不带参数即可列出。合并前的必跑项见下方「验证清单」。
 
-> **沙箱注意**：本机 npm 全局缓存在 `~/.npm`，在 workspace-write 沙箱下不可写，直接 `npm install`
-> 会报 `EPERM ... _cacache`。改用工作区内缓存：
-> `npm install --cache ./tmp/npm-cache --no-audit --no-fund`。
+> **npm**：直接用本机缓存（默认 `~/.npm`），不需要指定 `--cache`。
+> 若在受限沙箱里遇到 `EPERM ... _cacache`，那是环境限制而非权限问题——不要照 npm 提示
+> 去 `sudo chown`，而是让沙箱放开家目录写入，或临时加 `--cache ./tmp/npm-cache`。
 
 ## 开发流程（强制）
 
