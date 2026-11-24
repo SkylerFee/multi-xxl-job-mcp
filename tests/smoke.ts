@@ -5,6 +5,9 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { TargetRegistry } from "../src/registry.js";
 import { buildServer } from "../src/server.js";
@@ -91,6 +94,20 @@ async function main(): Promise<void> {
 
   const mcpClient = new Client({ name: "smoke-test", version: "1.0.0" });
   await mcpClient.connect(clientTransport);
+
+  // 服务版本必须与 package.json 一致。
+  // 这里曾经硬编码 0.0.1，而 package.json 已发到 0.1.0-beta.1，客户端握手看到的版本永远停在旧值。
+  // 现在版本由 src/server.ts 运行时从 package.json 读取，这条断言守住「读取逻辑没被改坏」。
+  const serverInfo = mcpClient.getServerVersion() as { version?: string } | undefined;
+  const pkgVersion = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json"), "utf8"),
+  ).version as string;
+  if (serverInfo?.version === pkgVersion) {
+    console.log(`冒烟测试通过: 握手版本与 package.json 一致（${pkgVersion}）`);
+  } else {
+    console.error(`冒烟测试失败: 握手版本 ${serverInfo?.version} 与 package.json ${pkgVersion} 不一致`);
+    process.exitCode = 1;
+  }
 
   const { tools } = await mcpClient.listTools();
   const names = tools.map((t) => t.name);
