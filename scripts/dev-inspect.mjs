@@ -66,6 +66,25 @@ function parseArgs(argv) {
 async function main() {
   const { modeFlags, rest, realHome, printArgs } = parseArgs(process.argv.slice(2));
 
+  // 先拼好参数：顺序是「模式 flag 最前（Inspector 要求）→ server 命令
+  // （避免被变长选项吞掉）→ 其余选项」。这段不依赖任何外部状态，因此能提前算。
+  const inspectorArgs = [
+    "--yes",
+    "@modelcontextprotocol/inspector",
+    ...modeFlags,
+    process.execPath,
+    serverEntry,
+    ...rest,
+  ];
+
+  // --print-args 只打印最终命令，不做任何前置校验或副作用。
+  // 它存在的意义就是「排查参数问题」，而参数问题恰恰常发生在配置缺失/未构建时——
+  // 若在这里先要求配置存在，这个开关在最需要它的时候反而不可用。
+  if (printArgs) {
+    console.log(inspectorArgs.join(" "));
+    return;
+  }
+
   if (!existsSync(serverEntry)) {
     console.error("[dev:inspect] 找不到 " + serverEntry);
     console.error("[dev:inspect] 先跑 npm run build");
@@ -95,23 +114,6 @@ async function main() {
   // Inspector 默认把密钥写进文件（无 OS keychain 时是明文）。调试场景没有需要长期保存的
   // 密钥，改用内存存储，既避免明文落盘，也免掉每次启动的一串警告。用户显式设置时不覆盖。
   env.MCP_INSPECTOR_SECRET_STORE = env.MCP_INSPECTOR_SECRET_STORE ?? "memory";
-
-  // 顺序：模式 flag 最前（Inspector 要求）→ server 命令（避免被变长选项吞掉）→ 其余选项
-  const inspectorArgs = [
-    "--yes",
-    "@modelcontextprotocol/inspector",
-    ...modeFlags,
-    process.execPath,
-    serverEntry,
-    ...rest,
-  ];
-
-  // --print-args：只打印最终参数，不真正启动 Inspector。
-  // 用于排查参数顺序问题，以及让测试能在不联网、不开端口的前提下断言顺序。
-  if (printArgs) {
-    console.log(inspectorArgs.join(" "));
-    return;
-  }
 
   console.error("[dev:inspect] 配置来源: " + (realHome ? "真实 HOME" : "tmp/dev-home"));
   console.error("[dev:inspect] 启动: npx " + inspectorArgs.slice(1).join(" "));

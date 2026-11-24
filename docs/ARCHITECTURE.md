@@ -151,7 +151,7 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 
 | 工具 | 底层 | 要点 |
 |---|---|---|
-| `list_instances` | 无网络请求 | 读注册表内存中的配置，按系统分组；**不含密码**；`usesEnvVars` 标记该目标是否用了插值 |
+| `list_instances` | 无网络请求 | 读注册表内存中的配置，按系统分组。**只返回寻址必需的信息**：`system` / `env` / `alias` / `url`（已剥离 URL 中的 `user:pass@`）。不含 username、password；`usesEnvVars` 与 `urlCredentialsEmbedded` 仅在为真时出现 |
 
 ### 执行器组
 
@@ -194,6 +194,7 @@ XXL-JOB 各版本／二开版接口有差异，代码里能看到三处显式处
 | 4 | ~~`remove_job` 没有任何测试~~ **已修复** | 根因是 `tests/mock-admin.ts` 从未实现 `/jobinfo/remove` 端点 | 多系统改造中补上该端点，`remove_job` 现由集成测试端到端覆盖 | — |
 | 5 | ~~`trigger_job` 里的 code 检查是死代码~~ **已修复** | `request()` 已在返回前对非 200 抛错 | 回归测试验证 trigger 行为不变 | 删除冗余判断，减少读码噪声 |
 | 6 | ~~`get_job_log_content` 的 `triggerTime` 产出 `type: ["number","string"]`，部分客户端拒收整个工具~~ **已修复** | `server.ts` 的 `triggerTime: z.union([...])` —— zod 对基本类型 union 必然产出 type 数组 | MCP Inspector 的 `--strict` 可复现；smoke 现加了 type 数组扫描守卫 | **修复方式**：改为 `z.union([z.string(), z.int()])`，zod 因此输出 `anyOf`（每个分支单一 type），运行时接受范围不变（number / string 都收，对象等被拒） |
+| 7 | ~~`list_instances` 返回登录用户名，且 URL 中内嵌的 `user:pass@` 会原样输出；同一凭据还会经启动日志与请求失败的错误信息二次泄漏~~ **已修复** | `server.ts` 的 list_instances 直接透传 `describe().username`；`registry.ts` 日志与 `client.ts` 的 `rawFetch` 错误信息都用原始 url | 用 `http://admin:secret123@host/...` 形式的配置实测：改造前工具输出与日志均含 `secret123` / `admin` | **修复方式**：新增 `redactUrlCredentials()` 统一剥离 URL userinfo；`TargetDescription` 去掉 `username`，改为 `hasUsername` 布尔；list_instances 输出收敛到寻址必需字段；日志与错误信息全部改用脱敏地址。测试从 3 个渠道（工具输出 / 日志 / 错误信息）分别断言不含凭据 |
 
 ## 测试怎么分工
 

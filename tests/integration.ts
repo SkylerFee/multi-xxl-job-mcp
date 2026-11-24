@@ -75,11 +75,17 @@ async function main(): Promise<void> {
   // 0. 目标发现
   console.log("\n[0] list_instances");
   const inst = await call(mcp, "list_instances", {});
-  const instData = inst.data as { systems: { system: string; alias: string; instances: Record<string, { url: string; username: string; usesEnvVars: boolean }> }[] };
+  const instData = inst.data as { systems: { system: string; alias: string; instances: Record<string, { url: string; usesEnvVars?: boolean }> }[] };
   check("无错误", !inst.isError, inst.raw);
   check("返回 1 个系统且别名为中文", instData?.systems?.length === 1 && instData.systems[0].alias === "订单系统", instData);
   check("返回 2 个环境", Object.keys(instData?.systems?.[0]?.instances ?? {}).length === 2, instData);
-  check("结果不含密码字段", !inst.raw.includes("mock-pass"), "响应中出现了密码");
+
+  // 凭据不得出现在工具输出里：这段 JSON 会进入 AI 对话上下文并被客户端留存，
+  // 因此密码与用户名都不该出现，哪怕只是「方便排查」。
+  check("结果不含密码", !inst.raw.includes("mock-pass"), "响应中出现了密码");
+  check("结果不含 username 字段", !inst.raw.includes("username"), inst.raw);
+  check("结果不含配置的登录名", !inst.raw.includes("\"admin\""), inst.raw);
+  check("结果保留 url 供确认环境", (instData?.systems?.[0]?.instances?.dev?.url ?? "").includes("xxl-job-admin"), inst.raw);
 
   // 1. 执行器组
   console.log("\n[1] list_job_groups");

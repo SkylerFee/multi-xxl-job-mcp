@@ -10,7 +10,7 @@
  */
 
 import { XxlJobClient } from "./client.js";
-import { ConfigFile, EnvConfig, XxlJobConfig } from "./config.js";
+import { ConfigFile, EnvConfig, redactUrlCredentials, XxlJobConfig } from "./config.js";
 
 /** 日志前缀，与 config.ts / server.ts 保持一致 */
 const LOG_PREFIX = "[multi-xxl-job-mcp]";
@@ -39,14 +39,22 @@ export interface TargetSummary {
   envs: string[];
 }
 
-/** describe() 的结果：可安全展示给调用方的目标信息（刻意不含密码） */
+/**
+ * describe() 的结果：可安全展示给调用方的目标信息。
+ *
+ * **这是「给 AI 看」的视图，不是「给客户端用」的视图**——后者是 EnvConfig，
+ * 含 username 与 password。这里只保留调用方真正需要的寻址信息，
+ * 任何凭据（密码、用户名、URL 里的 userinfo）都不得出现。
+ */
 export interface TargetDescription {
-  /** 调度中心地址 */
+  /** 调度中心地址（已剥离 URL 中的 userinfo，可安全展示与写日志） */
   url: string;
-  /** 登录用户名 */
-  username: string;
   /** 该目标是否有字段引用了 ${VAR} 环境变量 */
   usesEnvVars: boolean;
+  /** 是否有独立配置的登录用户名（只给布尔值，不泄漏账号本身） */
+  hasUsername: boolean;
+  /** 是否在 URL 里内嵌了 userinfo 凭据（提示调用方该写法会把凭据带进网络层） */
+  hasUrlCredentials: boolean;
 }
 
 /**
@@ -147,8 +155,9 @@ export class TargetRegistry<TClient = XxlJobClient> {
     const envConfig = this.requireTarget(system, env);
     const client = this.createClient(toClientConfig(envConfig));
     this.clients.set(key, client);
-    // 日志只打地址与用户名，绝不打密码
-    this.logger("创建客户端: " + key + " -> " + envConfig.url + "（用户名 " + envConfig.username + "）");
+    // 日志只用脱敏地址，且不打用户名：日志会被收集、转发、长期留存，
+    // 而「用户名 + 弱口令」就足以撞开调度中心，没必要给它这项便利。
+    this.logger("创建客户端: " + key + " -> " + redactUrlCredentials(envConfig.url));
     return client;
   }
 
@@ -167,9 +176,10 @@ export class TargetRegistry<TClient = XxlJobClient> {
   }
 
   /**
-   * 描述某个目标：地址、用户名、是否用了环境变量插值。
+   * 描述某个目标：脱敏后的地址、是否用了环境变量插值、是否内嵌了 URL 凭据。
    *
-   * 刻意不返回密码，调用方可以原样展示或写入日志。
+   * **刻意不返回任何凭据**：不返回密码，不返回用户名，且 URL 里的 userinfo 会被剥离。
+   * 返回值可以原样展示给 AI、写进日志、或放进错误信息。
    *
    * @param system 系统名
    * @param env 环境名
@@ -177,10 +187,16 @@ export class TargetRegistry<TClient = XxlJobClient> {
    */
   describe(system: string, env: string): TargetDescription {
     const envConfig = this.requireTarget(system, env);
+    const redactedUrl = redactUrlCredentials(envConfig.url);
     return {
-      url: envConfig.url,
-      username: envConfig.username,
+      url: redactedUrl,
       usesEnvVars: envConfig.usesEnvVars === true,
+      // 只暴露「有没有配置用户名」这个布尔事实。AI 不需要知道账号是什么，
+      // 而账号本身就是凭据的一半（配合常见弱口令即可撞库）。
+      hasUsername: envConfig.username.trim() !== "",
+      // 剥离前后不一致 => 原 URL 里带了 userinfo。把这件事告诉调用方是有价值的，
+      // 因为那种写法会把凭据送进网络层与各类访问日志，属于需要纠正的配置方式。
+      hasUrlCredentials: redactedUrl !== envConfig.url,
     };
   }
 
