@@ -294,7 +294,7 @@ npm run dev:client -- --real-home
 
 **为什么 Inspector 不进 devDependencies**：它是调试便利工具，`npx` 按需拉取即可。
 装进依赖会让 `node_modules` 多出一大坨、拉长 `npm ci`，而它对运行和测试都没有必要。
-脚本里已把 `npm_config_cache` 指到 `tmp/npm-cache`，沙箱下也能正常拉包。
+它走本机默认的 npm 缓存，所以 Inspector 只会下载一次。
 
 > **schema 可移植性自检**：`npm run smoke` 会扫描所有工具的 inputSchema，拒绝 `type: ["number","string"]`
 > 这类数组写法。它合法但不可移植——把 tool schema 映射到单一 `type` 方言的客户端（如 Gemini

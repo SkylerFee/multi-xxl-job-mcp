@@ -282,7 +282,7 @@ npm run dev:inspect -- --real-home
 npm run dev:client -- --real-home
 ```
 
-**Why the Inspector is not a devDependency**: it is a convenience tool, pulled on demand via `npx`. Installing it would bloat `node_modules` and slow `npm ci`, and neither the runtime nor the tests need it. The scripts point `npm_config_cache` at `tmp/npm-cache` so package fetching works in sandboxed environments too.
+**Why the Inspector is not a devDependency**: it is a convenience tool, pulled on demand via `npx`. Installing it would bloat `node_modules` and slow `npm ci`, and neither the runtime nor the tests need it. It uses your normal npm cache, so the Inspector is only downloaded once.
 
 > **Schema portability check**: `npm run smoke` scans every tool's inputSchema and rejects array-style `type` declarations such as `type: ["number","string"]`. They are legal JSON Schema but not portable — clients that map tool schemas onto a single-`type` dialect (such as the OpenAPI subset used for Gemini function declarations) may reject the whole tool or silently drop the constraint. Use `anyOf` when a field accepts multiple types.
 
