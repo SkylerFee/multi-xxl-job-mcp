@@ -1,6 +1,6 @@
 {
   "name": "@skylerfee/multi-xxl-job-mcp",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0",
   "description": "Multi-instance MCP Server for XXL-JOB admin: query/add/update jobs, start/stop, manual trigger and execution log viewing via XXL-JOB admin web API",
   "type": "module",
   "license": "MIT",

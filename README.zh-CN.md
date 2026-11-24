@@ -11,6 +11,8 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 > 本项目 fork 自 [shaguocgl/mcp-xxl-job](https://github.com/shaguocgl/mcp-xxl-job)，
 > 在上游基础上更名为 `multi-xxl-job-mcp` 并独立维护。上游的 npm 包与 Glama 收录均与本项目无关。
 
+版本变更见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 功能特性
 
 - **执行器组管理** — 查询执行器组列表及在线机器地址
@@ -148,7 +150,7 @@ systems:
 # 正式版
 npm install -g @skylerfee/multi-xxl-job-mcp
 
-# 预览版（beta 通道）
+# 预览版（beta 通道；正式版发布后仍指向最后一个预览版）
 npm install -g @skylerfee/multi-xxl-job-mcp@beta
 
 # 或直接运行，不安装

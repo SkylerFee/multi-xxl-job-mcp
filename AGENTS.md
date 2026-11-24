@@ -128,6 +128,7 @@ rm -rf "$TMPHOME"
 | **架构怎么搭的、每个工具背后发生什么、哪里有坑** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 某个调度术语到底指什么 | [GLOSSARY.md](GLOSSARY.md) |
 | 怎么发版、首次发布为什么必须手动 | [docs/RELEASING.md](docs/RELEASING.md) |
+| 每个版本改了什么 | [CHANGELOG.md](CHANGELOG.md) |
 | 为什么某个地方要写得这么绕 | [docs/adr/](docs/adr/) |
 | issue 记在哪、标签怎么用 | [docs/agents/](docs/agents/) |
 
