@@ -67,8 +67,24 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MC
 ### 生成配置文件
 
 ```bash
-multi-xxl-job-mcp init
+multi-xxl-job-mcp init      # 交互式生成，可连续添加多个环境/系统
+multi-xxl-job-mcp add       # 在已有配置上追加一个环境或一个系统
+multi-xxl-job-mcp help      # 查看全部命令
 ```
+
+`init` 收集完第一条后不会直接退出，而是询问接下来做什么：
+
+```
+接下来要做什么？
+  i  在当前系统下再加一个环境（instance）
+  s  再加一个系统（system）
+  d  结束（默认）
+```
+
+所有条目在结束时**一次性写入**——中途 Ctrl-D 不会留下写了一半的配置。
+
+`add` 用于事后追加，只改目标节点，其余内容原样保留（含其它系统、其它环境与 `alias`）。
+配置文件不存在时它会报错而不是新建——那属于 `init` 的职责。
 
 交互式生成到手头无需记忆的路径（各平台自动判定）：
 

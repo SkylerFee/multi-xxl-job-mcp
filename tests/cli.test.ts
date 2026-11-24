@@ -110,9 +110,12 @@ async function main(): Promise<void> {
     check("用户名默认 admin", env1.username === DEFAULT_USERNAME, env1.username);
     check("密码来自输入", env1.password === "s3cret");
     check("打印了配置文件的绝对路径", p1.lines.some((l) => l.includes(newPath)), p1.lines);
+    // 旧版这里提示「手动编辑 YAML 的新增系统/新增环境」；现在提供了 add 子命令，
+    // 提示改为指向它。断言跟着改为「给出了可执行的继续添加方式」，
+    // 而不是绑死某个具体措辞——否则每次文案调整都要改测试。
     check(
-      "提示了如何添加更多系统/环境",
-      p1.lines.some((l) => l.includes("新增系统")) && p1.lines.some((l) => l.includes("新增环境")),
+      "提示了如何继续添加系统/环境",
+      p1.lines.some((l) => l.includes("add")) && p1.lines.some((l) => l.includes("编辑")),
       p1.lines,
     );
 

@@ -92,8 +92,26 @@ A `system` may have any number of `env` entries, each pointing at an independent
 ### Generating a config file
 
 ```bash
-multi-xxl-job-mcp init
+multi-xxl-job-mcp init      # interactive; can add multiple environments/systems in one session
+multi-xxl-job-mcp add       # append one environment or system to an existing config
+multi-xxl-job-mcp help      # list all commands
 ```
+
+`init` does not exit after the first entry — it asks what to do next:
+
+```
+接下来要做什么？
+  i  在当前系统下再加一个环境（instance）
+  s  再加一个系统（system）
+  d  结束（默认）
+```
+
+Everything is written **once at the end**, so an interrupted session (Ctrl-D) never leaves a
+half-written config behind.
+
+`add` appends to an existing config, touching only the target node — other systems, other
+environments and `alias` values are preserved. If the config file does not exist it reports an
+error instead of creating one; that is `init`'s job.
 
 This interactively writes the config to a single, memorable path across all platforms:
 

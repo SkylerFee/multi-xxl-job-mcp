@@ -46,6 +46,7 @@
     "test:config": "node dist/tests/config.test.js",
     "test:registry": "node dist/tests/registry.test.js",
     "test:cli": "node dist/tests/cli.test.js",
+    "test:cli-add": "node dist/tests/cli-add.test.js",
     "test": "node scripts/test-all.mjs",
     "test:regression": "node dist/tests/regression.test.js",
     "test:dev": "node dist/tests/dev-scaffold.test.js",

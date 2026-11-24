@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import { XxlJobClient, XxlJobApiError } from "./client.js";
-import { runInit } from "./cli.js";
+import { HELP_TEXT, runAdd, runInit } from "./cli.js";
 import { loadConfigFromDefaultPath } from "./config.js";
 import { TargetError, TargetRegistry } from "./registry.js";
 import {
@@ -618,17 +618,53 @@ async function runInitCommand(): Promise<void> {
   }
 }
 
-// 直接运行时按子命令分发：init 走配置生成，其余启动 stdio 服务
+/** 把错误转成可读消息的本地简写，避免每处重复写 instanceof 判断 */
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/**
+ * 处理 add 子命令：在已有配置上追加环境或系统。
+ *
+ * 与 init 同样处理取消语义：用户选「取消」时磁盘未被修改，用非零码让脚本停下。
+ */
+async function runAddCommand(): Promise<void> {
+  const result = await runAdd();
+  if (result.status === "aborted") {
+    process.exitCode = 1;
+  }
+}
+
+/** 打印帮助到 stdout（用户显式求助，属于正常输出而非错误） */
+function printHelp(): void {
+  console.log(HELP_TEXT);
+}
+
+// 直接运行时按子命令分发。
+// 注意：不接受未知子命令直接启动服务——那样 `foo start` 之类的笔误会静默变成
+// 「启动 stdio 服务」，客户端连上来却发现参数被忽略，很难排查。未知命令一律报错并指向 help。
 if (isMainModule()) {
-  if (process.argv[2] === "init") {
-    runInitCommand().catch((e) => {
-      console.error(`[${SERVER_NAME}] init 失败: ${e instanceof Error ? e.message : e}`);
-      process.exit(1);
-    });
-  } else {
+  const command = process.argv[2];
+  if (command === undefined) {
     main().catch((e) => {
-      console.error(`[${SERVER_NAME}] 启动失败: ${e instanceof Error ? e.message : e}`);
+      console.error("[" + SERVER_NAME + "] 启动失败: " + errMsg(e));
       process.exit(1);
     });
+  } else if (command === "init") {
+    runInitCommand().catch((e) => {
+      console.error("[" + SERVER_NAME + "] init 失败: " + errMsg(e));
+      process.exit(1);
+    });
+  } else if (command === "add") {
+    runAddCommand().catch((e) => {
+      console.error("[" + SERVER_NAME + "] add 失败: " + errMsg(e));
+      process.exit(1);
+    });
+  } else if (command === "help" || command === "--help" || command === "-h") {
+    printHelp();
+  } else {
+    console.error("[" + SERVER_NAME + "] 未知命令: " + command);
+    console.error("运行 `multi-xxl-job-mcp help` 查看可用命令。");
+    process.exit(1);
   }
 }
