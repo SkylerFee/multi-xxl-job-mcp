@@ -4,7 +4,7 @@
 |---|---|
 | Issue | [#11](https://github.com/SkylerFee/multi-xxl-job-mcp/issues/11) |
 | 拆票 | #12 配置解析层 · #13 目标注册表 · #14 查询类工具 · #15 写操作类工具 · #16 init 子命令 · #17 文档同步 |
-| 状态 | 设计已定稿，实现未开始 |
+| 状态 | 设计已定稿，**已全部实现并合并**（#12–#17 均已完成）|
 | 兼容性 | 不兼容旧环境变量，按新项目开发 |
 
 ```
@@ -12,6 +12,18 @@
       │         └──> #15 ──┼──> #17
       └──> #16 ────────────┘
 ```
+
+> **本文档是当时的设计记录，保留原始决策语境。**
+> 实现落地的过程中有几处与设计不同，读本文时请以下方「实现现状」为准，
+> 行为细节以 [docs/ARCHITECTURE.md](../ARCHITECTURE.md) 和源码为最终依据。
+
+**实现现状与本文的差异：**
+
+| 本文描述 | 实际实现 |
+|---|---|
+| 配置路径按平台原生惯例分三套 | 三平台统一 `$XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml`（未设为 `~/.config/...`），见 [ADR-0004](../adr/0004-unified-config-path.md) |
+| `list_instances` 返回 `url` / `username` / `usesEnvVars` | 返回 `url`（已剥离 URL 内嵌凭据）以及按需出现的 `usesEnvVars` / `urlCredentialsEmbedded`，**不返回 `username`，也不返回任何凭据** |
+| `engines.node` 未涉及 | 现为 `>=26`，以 `.node-version` 为基准 |
 
 ---
 
