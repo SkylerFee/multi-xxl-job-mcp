@@ -1,6 +1,6 @@
 {
   "name": "@skylerfee/multi-xxl-job-mcp",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Multi-instance MCP Server for XXL-JOB admin: query/add/update jobs, start/stop, manual trigger and execution log viewing via XXL-JOB admin web API",
   "type": "module",
   "license": "MIT",
@@ -49,8 +49,6 @@
     "test": "node scripts/test-all.mjs",
     "test:regression": "node dist/tests/regression.test.js",
     "test:dev": "node dist/tests/dev-scaffold.test.js",
-    "release:check": "node scripts/release-policy.mjs",
-    "release:dry-run": "npm pack --dry-run",
     "release:check": "node scripts/release-policy.mjs",
     "release:dry-run": "npm pack --dry-run",
     "dev:mock": "node scripts/dev-mock.mjs",
