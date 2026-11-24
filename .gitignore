@@ -58,3 +58,11 @@ Desktop.ini
 # Agent scratch / local npm cache
 tmp/
 .scratch/
+
+# Agent scratch files that may land in the repo root instead of tmp/.
+# (tmp/ above only matches the directory; a file named tmp-commit.txt in the
+# repo root is NOT covered by it — that is how one slipped into a commit once.)
+*-commit.txt
+commit-msg.txt
+pr-body.md
+pr-*.md
