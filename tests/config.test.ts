@@ -13,6 +13,7 @@ import {
   buildConfig,
   interpolate,
   loadConfigFile,
+  redactUrlCredentials,
   resolveConfigPath,
   ConfigError,
 } from "../src/config.js";
@@ -153,6 +154,29 @@ function main(): void {
     check("win32 与 linux 一致（不再用 APPDATA）", resolveConfigPath("win32", {}, home) === expected, resolveConfigPath("win32", {}, home));
     check("darwin 也尊重 XDG_CONFIG_HOME", resolveConfigPath("darwin", { XDG_CONFIG_HOME: "/xdg" }, home) === "/xdg/multi-xxl-job-mcp/config.yaml", resolveConfigPath("darwin", { XDG_CONFIG_HOME: "/xdg" }, home));
     check("三平台返回同一路径", new Set(["linux", "darwin", "win32"].map((p) => resolveConfigPath(p as NodeJS.Platform, {}, home))).size === 1);
+
+    console.log("[9] URL 凭据剥离（redactUrlCredentials）");
+    // 这条函数是 list_instances / 日志 / 错误信息共用的脱敏入口，
+    // 一旦它失效，凭据会同时从三个渠道泄漏出去，所以边界要逐个钉住。
+    const cases: [string, string, string][] = [
+      ["剥掉 user:pass", "http://admin:secret@host:8080/xxl-job-admin", "http://host:8080/xxl-job-admin"],
+      ["剥掉只含 user 的写法", "https://token@host/xxl-job-admin", "https://host/xxl-job-admin"],
+      ["剥掉百分号编码的密码", "http://u:p%40ss@host/x", "http://host/x"],
+      ["无 userinfo 时原样返回", "http://host:8080/xxl-job-admin", "http://host:8080/xxl-job-admin"],
+      ["https 保留 scheme", "https://a:b@h.com/p", "https://h.com/p"],
+      ["空串原样返回", "", ""],
+      ["不含 scheme 的字符串不动", "host:8080/xxl-job-admin", "host:8080/xxl-job-admin"],
+    ];
+    for (const [name, input, expected] of cases) {
+      const actual = redactUrlCredentials(input);
+      check(name, actual === expected, { input, expected, actual });
+    }
+    check("剥离后不再含密码", !redactUrlCredentials("http://admin:secret@h/x").includes("secret"));
+    check("剥离后保留 host 与 path", redactUrlCredentials("http://admin:secret@h:8080/xxl-job-admin").includes("h:8080/xxl-job-admin"));
+    check(
+      "多次调用幂等",
+      redactUrlCredentials(redactUrlCredentials("http://a:b@h/x")) === redactUrlCredentials("http://a:b@h/x"),
+    );
 
   } finally {
     rmSync(dir, { recursive: true, force: true });

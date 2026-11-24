@@ -289,9 +289,17 @@ function main(): void {
 
     const dev: TargetDescription = registry.describe("order", "dev");
     check("describe.url", dev.url === "http://127.0.0.1:8080/xxl-job-admin", dev.url);
-    check("describe.username", dev.username === "admin", dev.username);
     check("无插值时 usesEnvVars 为 false", dev.usesEnvVars === false, dev.usesEnvVars);
-    check("describe 只有三个字段", Object.keys(dev).sort().join(",") === "url,username,usesEnvVars", Object.keys(dev));
+    // describe 是「给 AI 看的视图」，字段集合本身就是安全契约：一旦有人加了 username
+    // 之类的字段，这条断言会失败，逼迫改动者正面回答「为什么 AI 需要这个凭据」。
+    check(
+      "describe 只有 url / hasUsername / hasUrlCredentials / usesEnvVars 四个字段",
+      Object.keys(dev).sort().join(",") === "hasUrlCredentials,hasUsername,url,usesEnvVars",
+      Object.keys(dev),
+    );
+    check("describe 不含 username 字段", !("username" in dev), Object.keys(dev));
+    check("hasUsername 反映已配置用户名", dev.hasUsername === true, dev.hasUsername);
+    check("普通 URL 不算内嵌凭据", dev.hasUrlCredentials === false, dev.hasUrlCredentials);
 
     const prod: TargetDescription = registry.describe("order", "prod");
     check("有插值时 usesEnvVars 为 true", prod.usesEnvVars === true, prod.usesEnvVars);

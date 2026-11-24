@@ -124,19 +124,29 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
     {
       title: "列出所有可用目标",
       description:
-        "列出配置文件中所有业务系统及其可用环境，返回系统名、别名、各环境的地址与登录用户名（不含密码）。" +
-        "调用其他工具前先用它确认该传什么 system / env。",
+        "列出所有业务系统及其可用环境，返回 system / env 两个调用参数，以及该目标的调度中心地址（已脱敏）。" +
+        "**不返回任何账号密码**。调用其他工具前先用它确认该传什么 system / env。",
       inputSchema: {},
     },
     async () => {
       try {
+        // 只输出「调用方寻址所必需」的字段：
+        //   system / env —— 后续所有工具的入参
+        //   alias         —— 给人看的可读名，便于确认选对了系统
+        //   url           —— 已剥离 userinfo，用于确认连的是哪套环境
+        // 刻意不含 username、password：AI 不需要它们就能完成任务，
+        // 而工具输出会进入对话上下文、被客户端留存、可能上报给模型服务商。
         const systems = registry.list().map((s) => ({
           system: s.system,
           alias: s.alias,
           instances: Object.fromEntries(
             s.envs.map((envName) => {
               const d = registry.describe(s.system, envName);
-              return [envName, { url: d.url, username: d.username, usesEnvVars: d.usesEnvVars }];
+              const instance: Record<string, unknown> = { url: d.url };
+              // 仅在有信息量时附加，避免绝大多数正常配置下出现噪音字段
+              if (d.usesEnvVars) instance.usesEnvVars = true;
+              if (d.hasUrlCredentials) instance.urlCredentialsEmbedded = true;
+              return [envName, instance];
             }),
           ),
         }));

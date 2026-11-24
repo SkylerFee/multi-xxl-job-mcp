@@ -5,7 +5,7 @@
  * 自动登录并维护 XXL_JOB_LOGIN_IDENTITY Cookie，Cookie 失效时自动重登一次。
  */
 
-import { XxlJobConfig } from "./config.js";
+import { redactUrlCredentials, XxlJobConfig } from "./config.js";
 import {
   LogDetailCat,
   PageResult,
@@ -107,10 +107,14 @@ export class XxlJobClient {
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // 错误信息会原样回给调用方（进而进入 AI 对话与日志），因此必须用脱敏地址。
+      // fetch 自身的错误文本里也可能带原始 url（部分实现会拼接），一并替换掉。
+      const safeUrl = redactUrlCredentials(url);
+      const safeMsg = redactUrlCredentials(msg);
       throw new XxlJobApiError(
-        `请求 XXL-JOB 调度中心失败（${url}）: ${msg}。请确认配置文件中的 url 可达`,
+        `请求 XXL-JOB 调度中心失败（${safeUrl}）: ${safeMsg}。请确认配置文件中的 url 可达`,
         undefined,
-        url,
+        safeUrl,
       );
     }
     return resp;

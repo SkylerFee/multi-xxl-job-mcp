@@ -71,6 +71,27 @@ function hasEnvVarRef(raw: unknown): boolean {
 /** 默认 HTTP 超时（毫秒） */
 const DEFAULT_TIMEOUT_MS = 15000;
 
+/** URL 中的 userinfo 段（scheme://user:pass@host），用于剥离凭据后再展示 */
+const URL_USERINFO_PATTERN = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/@]*@/;
+
+/**
+ * 把 URL 里的 userinfo（`user:password@`）剥掉，只保留 scheme 与 host/path。
+ *
+ * 为什么需要：配置文件允许把凭据直接写在 url 里
+ * （`http://admin:secret@host/xxl-job-admin`），这种写法会被 fetch 原生支持，
+ * 因此不能用「禁止」来回避。但 url 会出现在 list_instances 的返回值、启动日志、
+ * 以及请求失败的错误信息里——原样输出等于把密码抄送给 AI 与日志系统。
+ *
+ * 剥离后的地址仍然可读、可用于排查（host 与 path 一个不少），只是不再含凭据。
+ *
+ * @param url 原始调度中心地址
+ * @returns 去掉 userinfo 的地址；不含 userinfo 时原样返回
+ */
+export function redactUrlCredentials(url: string): string {
+  if (typeof url !== "string" || url === "") return url;
+  return url.replace(URL_USERINFO_PATTERN, "$1");
+}
+
 /** 权限检查掩码：除属主外任何权限位被置位都算宽松 */
 const PERMISSIVE_MODE_MASK = 0o077;
 
