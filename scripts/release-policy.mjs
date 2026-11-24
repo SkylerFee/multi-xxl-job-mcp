@@ -94,6 +94,9 @@ export function assertPackageEntries(entries) {
       entry === "package/package.json" ||
       entry === "package/LICENSE" ||
       entry === "package/README.md" ||
+      // 中文 README 会随 files 一起打包：npm 自动包含仓库根目录的 README* 文件。
+      // 它是合法文档，显式批准；不放进 required，因为英文 README 已足够。
+      entry === "package/README.zh-CN.md" ||
       /^package\/dist\/src\/[a-zA-Z0-9_-]+\.js$/.test(entry);
     if (!allowed) {
       throw new Error("制品包含白名单外文件：" + entry + "（若是新增的合法产物，请更新 release-policy.mjs 的白名单）");
