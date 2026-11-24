@@ -113,11 +113,17 @@ jobs:
       contents: read
       id-token: write
     steps:
-      # 这个 job 不 checkout、不安装项目依赖、不执行仓库脚本——只发布已有的 tgz
+      # 这个 job 不 checkout、不安装项目依赖、不执行仓库脚本——只发布已有的 tgz。
+      #
+      # 正因不 checkout，这里不能用 node-version-file：那个文件在仓库里，
+      # 没有 checkout 就读不到，会在 Setup Node.js 一步失败
+      # （The specified node version file ... does not exist）。
+      # 发布任务只需要一个能跑 npm 的 Node，硬编码即可：
+      # 真正的构建与测试在 build job 已完成，这里不重新编译任何东西。
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .node-version
+          node-version: 26
           registry-url: https://registry.npmjs.org
 
       - name: 下载制品
