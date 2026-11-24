@@ -150,8 +150,8 @@ codegraph index                  # 全量重建
 codegraph status                 # 索引统计
 ```
 
-MCP 工具 `codegraph_explore` 等可用，但本会话启动时无默认项目，需传
-`projectPath=/Users/liufei/Projects/multi-xxl-job-mcp`。
+MCP 工具 `codegraph_explore` 等可用，但需显式传 `projectPath`，取当前仓库根目录的绝对路径
+（即 `pwd` 的输出）。不要在此写死某台机器上的路径——本仓库是公开项目，且路径因人而异。
 
 `.codegraph/` 下的数据库是本机产物，`.codegraph/.gitignore` 已忽略除自身外的全部文件——
 **这个 .gitignore 文件本身应当提交**，其余不要提交。
