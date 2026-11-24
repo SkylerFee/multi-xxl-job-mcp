@@ -6,6 +6,8 @@
 
 `multi-xxl-job-mcp` —— 通过 MCP 协议（stdio 传输）让 AI 助手管理 XXL-JOB 调度中心的 MCP Server。fork 自 `shaguocgl/mcp-xxl-job`，现独立维护。
 
+npm 包名：**`@skylerfee/multi-xxl-job-mcp`**（发布流程见 [docs/RELEASING.md](docs/RELEASING.md)）。可执行命令名仍为 `multi-xxl-job-mcp`（不带 scope）。
+
 - 语言/运行时：TypeScript + Node.js >= 26（ESM，`module: NodeNext`）。版本基准见 `.node-version`，
   不承诺向下兼容更低的 Node 版本
 - 关键依赖：`@modelcontextprotocol/sdk`、`zod`
@@ -125,6 +127,7 @@ rm -rf "$TMPHOME"
 | 这东西是干什么的、怎么配、怎么装 | [README.md](README.md) |
 | **架构怎么搭的、每个工具背后发生什么、哪里有坑** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 某个调度术语到底指什么 | [GLOSSARY.md](GLOSSARY.md) |
+| 怎么发版、首次发布为什么必须手动 | [docs/RELEASING.md](docs/RELEASING.md) |
 | 为什么某个地方要写得这么绕 | [docs/adr/](docs/adr/) |
 | issue 记在哪、标签怎么用 | [docs/agents/](docs/agents/) |
 

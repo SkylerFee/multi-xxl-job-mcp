@@ -123,7 +123,30 @@ systems:
 
 在 MCP 客户端（如 Claude Desktop、Cursor、Qoder 等）中添加以下配置：
 
-> **本包暂未发布到 npm**，因此请从源码构建使用。以下配置中的 `command` 指向本地可执行文件。
+安装方式二选一。
+
+**方式一：npm 安装（推荐）**
+
+```bash
+# 正式版
+npm install -g @skylerfee/multi-xxl-job-mcp
+
+# 预览版（beta 通道）
+npm install -g @skylerfee/multi-xxl-job-mcp@beta
+
+# 或直接运行，不安装
+npx -y @skylerfee/multi-xxl-job-mcp@latest
+```
+
+**方式二：从源码构建**（需要改代码或调试时）
+
+```bash
+git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
+cd multi-xxl-job-mcp
+npm install && npm run build && npm link
+```
+
+下面的客户端配置以源码方式为例；若用 npm 安装，`command` 直接写 `multi-xxl-job-mcp` 即可。
 
 **方式一：全局 link（推荐）**
 
@@ -174,7 +197,8 @@ npm link          # 之后任意位置可直接执行 multi-xxl-job-mcp
 ```
 
 > **提示**：Windows 下路径需使用正斜杠或双反斜杠，例如 `C:/tools/multi-xxl-job-mcp/dist/src/server.js`。
-> **发布后**：本包若发布到 npm，则可改回 `npm install -g multi-xxl-job-mcp` / `npx -y multi-xxl-job-mcp@latest`。
+> **发布流程**：见 [docs/RELEASING.md](docs/RELEASING.md)。采用 npm Trusted Publishing（OIDC），
+> 仓库里不存任何 npm token。
 
 ## 使用示例
 

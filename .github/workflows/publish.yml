@@ -1,0 +1,171 @@
+# 发布到 npm
+#
+# 设计要点：
+# - 由 GitHub Release 触发，而不是每次 push master。发布是显式动作。
+# - **两个 job 分离**：build 无 OIDC 权限（跑安装脚本与测试），publish 不碰仓库代码（只发布构建好的 tgz）。
+#   这样即使依赖链被投毒，也拿不到发布身份；即使发布身份被滥用，也没有代码执行面。
+# - 构建产物以 artifact 传递，publish 前核对 SHA-256，确保发布的就是验证过的那份。
+# - 所有第三方 action 固定到完整 commit SHA（与 ci.yml 保持一致）。
+# - 不使用任何 npm token：靠 GitHub OIDC + npm Trusted Publishing。
+#
+# 前置条件（首次发布前必须由维护者完成，详见 docs/RELEASING.md）：
+#   1. 手动发布首个版本（npm 不支持为尚不存在的包预配置 Trusted Publisher）
+#   2. 在 npm 包设置里把本文件配置为 Trusted Publisher
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+# 所有发布串行，取消旧任务可能截断已在进行的上传，因此不自动取消
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建并校验制品
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      dist-tag: ${{ steps.package.outputs.distTag }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # 发布标签必须落在 master 的历史上：防止从未合并的分支或伪造的 tag 发布
+      - name: 校验发布提交属于 master 历史
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor HEAD origin/master; then
+            echo '::error::发布提交不属于 master 历史'
+            exit 1
+          fi
+
+      - name: 校验版本、标签与 dist-tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: node scripts/release-policy.mjs
+
+      - name: 安装依赖并跑完整验证
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run smoke
+          npm test
+
+      # 打包与校验都在无 OIDC 权限的 runner 上完成
+      - name: 打包并校验产物
+        id: package
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/release"
+          npm pack --ignore-scripts --json --pack-destination "${RUNNER_TEMP}/release" > "${RUNNER_TEMP}/pack.json"
+          node <<'NODE'
+          const { readFileSync, renameSync } = require('node:fs');
+          const { join } = require('node:path');
+          const packed = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, 'pack.json'), 'utf8'));
+          if (packed.length !== 1) throw new Error('打包结果必须恰好包含一个 tarball');
+          const name = packed[0].filename;
+          if (!/^[a-zA-Z0-9.-]+\.tgz$/.test(name)) throw new Error('非法的 tarball 文件名: ' + name);
+          renameSync(join(process.env.RUNNER_TEMP, 'release', name), join(process.env.RUNNER_TEMP, 'release', 'package.tgz'));
+          NODE
+          node scripts/release-policy.mjs "${RUNNER_TEMP}/release/package.tgz"
+
+      - name: 上传制品
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/release/package.tgz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: 通过 OIDC 发布
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Trusted Publisher 必须绑定同名 environment；发布审批也在这一步之前完成
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # 这个 job 不 checkout、不安装项目依赖、不执行仓库脚本——只发布已有的 tgz
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: 下载制品
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/release
+
+      - name: 核对制品哈希与身份
+        env:
+          EXPECTED_VERSION: ${{ needs.build.outputs.version }}
+          EXPECTED_DIST_TAG: ${{ needs.build.outputs.dist-tag }}
+          EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { readFileSync } = require('node:fs');
+          const { createHash } = require('node:crypto');
+          const { execFileSync } = require('node:child_process');
+          const { join } = require('node:path');
+
+          const tarball = join(process.env.RUNNER_TEMP, 'release', 'package.tgz');
+          const sha256 = createHash('sha256').update(readFileSync(tarball)).digest('hex');
+          if (sha256 !== process.env.EXPECTED_SHA256) {
+            throw new Error('制品 SHA-256 与构建输出不符，拒绝发布');
+          }
+          const manifest = JSON.parse(execFileSync('tar', ['-xOzf', tarball, 'package/package.json'], { encoding: 'utf8' }));
+          if (manifest.name !== '@skylerfee/multi-xxl-job-mcp') throw new Error('制品包名不符: ' + manifest.name);
+          if (manifest.version !== process.env.EXPECTED_VERSION) throw new Error('制品版本不符: ' + manifest.version);
+          console.log('[publish] 制品核验通过', JSON.stringify({ version: manifest.version, sha256 }));
+          NODE
+
+      - name: 发布
+        env:
+          DIST_TAG: ${{ needs.build.outputs.dist-tag }}
+        run: npm publish "${RUNNER_TEMP}/release/package.tgz" --ignore-scripts --provenance --tag "${DIST_TAG}"
+
+      - name: 确认 registry 已可见
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if npm view "@skylerfee/multi-xxl-job-mcp@${VERSION}" version > /dev/null 2>&1; then
+              echo "[publish] registry 已可见 ${VERSION}"
+              exit 0
+            fi
+            echo "[publish] 等待 registry 索引 ${attempt}/30"
+            sleep 10
+          done
+          echo '::warning::上传成功但 registry 尚未索引，请稍后核实'
