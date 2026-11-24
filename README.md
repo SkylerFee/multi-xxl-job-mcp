@@ -11,6 +11,8 @@ MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — lets AI a
 > Forked from [shaguocgl/mcp-xxl-job](https://github.com/shaguocgl/mcp-xxl-job), renamed to `multi-xxl-job-mcp` and maintained independently.
 > The upstream npm package and Glama listing are unrelated to this project.
 
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## Features
 
 - **Executor group management** — list executor groups and their live machine addresses
@@ -57,7 +59,7 @@ Every tool except `list_instances` **requires both `system` and `env`**. This is
 # stable release
 npm install -g @skylerfee/multi-xxl-job-mcp
 
-# preview release (beta channel)
+# preview release (beta channel; stays on the last preview even after 0.1.0 ships)
 npm install -g @skylerfee/multi-xxl-job-mcp@beta
 
 # or run it without installing
