@@ -8,9 +8,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import { XxlJobClient, XxlJobApiError } from "./client.js";
@@ -25,9 +25,33 @@ import {
   XxlJobInfo,
 } from "./models.js";
 
-/** 服务标识与版本，需与 package.json 保持一致（MCP 客户端用它在 initialize 握手中识别服务） */
+/** 服务标识，MCP 客户端用它在 initialize 握手中识别服务 */
 const SERVER_NAME = "multi-xxl-job-mcp";
-const SERVER_VERSION = "0.0.1";
+
+/**
+ * 服务版本，运行时从 package.json 读取。
+ *
+ * 为什么不在源码里写死：这里曾硬编码 0.0.1，而 package.json 已经发到 0.1.0-beta.1，
+ * 结果客户端握手时看到的版本永远停在旧值——**没有任何机制能让两个数字保持同步**，
+ * 靠注释写「需与 package.json 保持一致」是无效约束。
+ *
+ * 路径推导：本文件编译后在 <包根>/dist/src/server.js，向上两级即包根，
+ * package.json 在那里。本地开发与 npm 安装后的目录结构一致，同一套推导都成立。
+ *
+ * 读取失败时回落到 "0.0.0"：版本号是展示信息，不该让整个服务启动失败。
+ */
+function readPackageVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const manifest = join(here, "..", "..", "package.json");
+    const parsed = JSON.parse(readFileSync(manifest, "utf8")) as { version?: unknown };
+    return typeof parsed.version === "string" && parsed.version.trim() !== "" ? parsed.version : "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+const SERVER_VERSION = readPackageVersion();
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
