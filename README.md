@@ -2,96 +2,119 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js >= 26](https://img.shields.io/badge/node-%3E%3D26-green.svg)](https://nodejs.org/)
+[![npm](https://img.shields.io/npm/v/@skylerfee/multi-xxl-job-mcp.svg)](https://www.npmjs.com/package/@skylerfee/multi-xxl-job-mcp)
 
-MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — 通过 MCP 协议让 AI 助手直接管理 XXL-JOB 定时任务。
+MCP Server for [XXL-JOB](https://github.com/xuxueli/xxl-job) Admin — lets AI assistants manage XXL-JOB scheduled tasks directly over the Model Context Protocol.
 
-**GitHub Repository：[multi-xxl-job-mcp](https://github.com/SkylerFee/multi-xxl-job-mcp)**
+**Repository: [multi-xxl-job-mcp](https://github.com/SkylerFee/multi-xxl-job-mcp)** · **中文文档: [README.zh-CN.md](README.zh-CN.md)**
 
-> 本项目 fork 自 [shaguocgl/mcp-xxl-job](https://github.com/shaguocgl/mcp-xxl-job)，
-> 在上游基础上更名为 `multi-xxl-job-mcp` 并独立维护。上游的 npm 包与 Glama 收录均与本项目无关。
+> Forked from [shaguocgl/mcp-xxl-job](https://github.com/shaguocgl/mcp-xxl-job), renamed to `multi-xxl-job-mcp` and maintained independently.
+> The upstream npm package and Glama listing are unrelated to this project.
 
-## 功能特性
+## Features
 
-- **执行器组管理** — 查询执行器组列表及在线机器地址
-- **任务全生命周期** — 查询、新增、修改、删除、启动、停止定时任务
-- **手动触发执行** — 支持覆盖运行参数、指定执行器地址
-- **调度预演** — 根据 Cron 表达式预演未来触发时间
-- **执行日志** — 分页查询调度记录，增量拉取日志正文
-- **安全设计** — 自动登录、Cookie 会话维护、失效自动重登
-- **防字段丢失** — 修改任务采用「读取-合并-写回」策略
+- **Executor group management** — list executor groups and their live machine addresses
+- **Full job lifecycle** — query, create, update, delete, start and stop scheduled jobs
+- **Manual triggering** — run a job immediately, optionally overriding run parameters or target executor address
+- **Schedule preview** — compute upcoming fire times from a Cron expression without touching the scheduler
+- **Execution logs** — paginate trigger records and pull log bodies incrementally
+- **Session handling** — automatic login, cookie session maintenance, and one automatic re-login on expiry
+- **No silent field loss** — updates use a read-merge-write strategy
 
-## 提供的 MCP 工具
+## MCP tools
 
-除 `list_instances` 外，**每个工具都必须传 `system` 与 `env` 指定目标**——这是刻意设计：定时任务上的误操作（尤其删除）不可恢复，显式寻址保证不会「忘记切换环境」。
+Every tool except `list_instances` **requires both `system` and `env`**. This is deliberate: mistakes on scheduled jobs (deletion especially) are unrecoverable, so explicit addressing prevents "forgot to switch environments".
 
-| 工具 | 功能 |
-|------|------|
-| `list_instances` | 列出所有系统与环境（**不含任何账号密码**），调用其他工具前先查它 |
-| `list_job_groups` | 分页查询执行器组列表 |
-| `list_jobs` | 分页查询任务列表（支持按执行器组、状态、描述等过滤） |
-| `get_job` | 查询单个任务完整配置 |
-| `add_job` | 新增任务（支持 CRON / FIX_RATE / NONE 调度类型） |
-| `update_job` | 修改任务配置（未传入字段保持原值） |
-| `remove_job` | 删除任务 |
-| `start_job` | 启动任务调度 |
-| `stop_job` | 停止任务调度 |
-| `trigger_job` | 手动触发一次执行 |
-| `preview_next_trigger_times` | 预演未来触发时间 |
-| `list_job_logs` | 分页查询执行日志 |
-| `get_job_log_content` | 增量拉取日志正文 |
+| Tool | Purpose |
+|------|---------|
+| `list_instances` | List all systems and environments (**never returns credentials**). Call this first to discover valid targets |
+| `list_job_groups` | Paginate executor groups |
+| `list_jobs` | Paginate jobs, with filters for executor group, status, description, etc. |
+| `get_job` | Fetch the full configuration of one job |
+| `add_job` | Create a job (schedule types: CRON / FIX_RATE / NONE) |
+| `update_job` | Update a job; omitted fields keep their current values |
+| `remove_job` | Delete a job |
+| `start_job` | Enable scheduling for a job |
+| `stop_job` | Disable scheduling for a job |
+| `trigger_job` | Run a job once immediately |
+| `preview_next_trigger_times` | Compute upcoming fire times |
+| `list_job_logs` | Paginate execution log records |
+| `get_job_log_content` | Pull log body incrementally |
 
-## 环境要求
+## Requirements
 
-- **Node.js** >= 26（版本基准见 `.node-version`，与 CI 保持一致）
-  > 不承诺向下兼容更低的 Node 版本。历史上曾需要 >= 18.15（低于该版本缺少
-  > `Headers.prototype.getSetCookie`，登录会「成功」但存不下 Cookie），现在整体以当前开发版本为基线。
+- **Node.js** >= 26 (see `.node-version`; CI uses the same version)
+  > No backward compatibility below this version is promised. Earlier releases required >= 18.15
+  > (older versions lack `Headers.prototype.getSetCookie`, so login "succeeds" but the cookie is
+  > never stored). The project now tracks the current development version as its baseline.
 - **XXL-JOB Admin** >= 2.3.0
 
+## Installation
 
-## 配置
+**Option 1: from npm (recommended)**
 
-### 核心概念
+```bash
+# stable release
+npm install -g @skylerfee/multi-xxl-job-mcp
 
-配置是**两层结构**：业务系统（system）→ 环境（env）。
+# preview release (beta channel)
+npm install -g @skylerfee/multi-xxl-job-mcp@beta
 
-| 概念 | 含义 |
-|------|------|
-| **系统** | 一个业务系统，如 `order`、`payment`；即工具调用的 `system` 参数 |
-| **环境** | 某系统下的一套调度中心连接，如 `dev`、`prod`；即 `env` 参数 |
-| **目标** | `system` + `env` 唯一确定的一个 XXL-JOB 调度中心 |
-| **别名** | 系统的可读名称（如「订单系统」），**仅用于展示，不参与寻址** |
+# or run it without installing
+npx -y @skylerfee/multi-xxl-job-mcp@latest
+```
 
-一个 `system` 可以有任意多套 `env`，每套指向独立的调度中心，会话与登录态彼此隔离。
+**Option 2: from source** (when you need to modify or debug the code)
 
-### 生成配置文件
+```bash
+git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
+cd multi-xxl-job-mcp
+npm install && npm run build && npm link
+```
+
+> Upgrading from source: `git pull && npm install && npm run build` — no need to re-link.
+
+## Configuration
+
+### Core concepts
+
+Configuration has **two levels**: business system (`system`) → environment (`env`).
+
+| Concept | Meaning |
+|---------|---------|
+| **System** | A business system such as `order` or `payment`; this is the `system` tool argument |
+| **Environment** | One scheduler connection under a system, such as `dev` or `prod`; this is the `env` argument |
+| **Target** | A single XXL-JOB Admin uniquely identified by `system` + `env` |
+| **Alias** | Human-readable system name (e.g. "Order System"). **Display only — never used for addressing** |
+
+A `system` may have any number of `env` entries, each pointing at an independent scheduler. Sessions and login state are isolated per target.
+
+### Generating a config file
 
 ```bash
 multi-xxl-job-mcp init
 ```
 
-交互式生成到手头无需记忆的路径（各平台自动判定）：
-
-**三个平台使用同一路径**：
+This interactively writes the config to a single, memorable path across all platforms:
 
 ```
 $XDG_CONFIG_HOME/multi-xxl-job-mcp/config.yaml
 ```
 
-未设置 `XDG_CONFIG_HOME` 时即 `~/.config/multi-xxl-job-mcp/config.yaml`（Windows 下 `~` 为 `%USERPROFILE%`）。
+When `XDG_CONFIG_HOME` is unset this resolves to `~/.config/multi-xxl-job-mcp/config.yaml` (`~` is `%USERPROFILE%` on Windows).
 
-不按平台分三套路径是刻意的：macOS 的 `Application Support` 是 GUI 应用惯例，命令行工具普遍不用它（`gh`、`opencode`、`redis-mcp` 都是 `~/.config`）。统一之后文档只写一条路径，跨平台排查时也能照着别人的路径去找。
+Using one path instead of three platform-specific ones is deliberate: macOS `Application Support` is a GUI convention that command-line tools generally ignore (`gh`, `opencode` and `redis-mcp` all use `~/.config`). With a single path there is one documented location, and a path from someone else's console is directly usable when troubleshooting.
 
+The server prints the absolute path it actually loaded on startup. See [config.example.yaml](./config.example.yaml) for a full example.
 
-服务启动时会打印实际读取的绝对路径。完整示例见 [config.example.yaml](./config.example.yaml)。
+### Config file format
 
-### 配置文件格式
-
-YAML 为主，也兼容 JSON（同一解析器）。最小示例：
+YAML by default; JSON is accepted by the same parser. Minimal example:
 
 ```yaml
 systems:
   order:
-    alias: 订单系统
+    alias: Order System
     instances:
       dev:
         url: http://127.0.0.1:8080/xxl-job-admin
@@ -104,296 +127,248 @@ systems:
         timeoutMs: 30000
 ```
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| `url` | ✅ | 调度中心地址，结尾斜杠会被去掉 |
-| `username` | ✅ | 登录用户名 |
-| `password` | ✅ | 登录密码 |
-| `timeoutMs` | ❌ | HTTP 超时（毫秒），默认 15000 |
-| `alias` | ❌ | 系统别名，仅展示；不校验唯一性 |
+| Field | Required | Description |
+|-------|----------|-------------|
+| `url` | ✅ | Scheduler URL; trailing slashes are stripped |
+| `username` | ✅ | Login user name |
+| `password` | ✅ | Login password |
+| `timeoutMs` | ❌ | HTTP timeout in milliseconds, default 15000 |
+| `alias` | ❌ | System display name; uniqueness is not enforced |
 
-**命名规则**：`system` 与 `env` 键名只能包含字母、数字、下划线和连字符。
+**Naming rules**: `system` and `env` keys may contain only letters, digits, underscores and hyphens.
 
-**凭据安全**：工具输出与日志里**不会出现账号密码**——`list_instances` 只返回寻址信息，
-若 url 里内嵌了 `user:pass@`，展示时会自动剥离（并以 `urlCredentialsEmbedded: true` 提示你纠正该写法）。
+**Credential safety**: accounts and passwords **never appear in tool output or logs**. `list_instances` returns addressing information only; if the `url` embeds `user:pass@`, it is stripped before display and flagged with `urlCredentialsEmbedded: true` so you can correct the pattern.
 
-任何字段值支持 `${VAR}` 环境变量插值。密码建议写成 `${MY_PASSWORD}` 并在 MCP 客户端的 `env` 里设置——这样配置文件本身不含明文。变量未设置时会直接报错，不会静默用空串登录。文件权限若为组或其他可读，启动时会告警。
+Any field value supports `${VAR}` interpolation. Prefer writing passwords as `${MY_PASSWORD}` and setting the variable in your MCP client's `env` so the config file itself holds no plaintext. An unset variable is a hard error — it will not silently log in with an empty string. If the file is readable by group or others, the server warns on startup.
 
-### MCP 客户端配置
+### MCP client setup
 
-在 MCP 客户端（如 Claude Desktop、Cursor、Qoder 等）中添加以下配置：
-
-安装方式二选一。
-
-**方式一：npm 安装（推荐）**
-
-```bash
-# 正式版
-npm install -g @skylerfee/multi-xxl-job-mcp
-
-# 预览版（beta 通道）
-npm install -g @skylerfee/multi-xxl-job-mcp@beta
-
-# 或直接运行，不安装
-npx -y @skylerfee/multi-xxl-job-mcp@latest
-```
-
-**方式二：从源码构建**（需要改代码或调试时）
-
-```bash
-git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
-cd multi-xxl-job-mcp
-npm install && npm run build && npm link
-```
-
-下面的客户端配置以源码方式为例；若用 npm 安装，`command` 直接写 `multi-xxl-job-mcp` 即可。
-
-**方式一：全局 link（推荐）**
-
-克隆并构建，然后用 `npm link` 把命令注册到全局：
-
-```bash
-git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
-cd multi-xxl-job-mcp
-npm install
-npm run build
-npm link          # 之后任意位置可直接执行 multi-xxl-job-mcp
-```
-
-> **升级**：拉取代码后重新构建即可，无需重新 link：
-> ```bash
-> git pull && npm install && npm run build
-> ```
-
-配置：
+Add this to your MCP client (Claude Desktop, Cursor, Qoder, etc.):
 
 ```json
 {
   "mcpServers": {
     "xxl-job": {
       "command": "multi-xxl-job-mcp"
-      // 无需 env：连接信息全部来自配置文件
-      // 若配置文件里用了 ${VAR} 插值，在此处设置对应变量，例如：
-      // "env": { "ORDER_PROD_USER": "admin", "ORDER_PROD_PASS": "<密码>" }
+      // No env needed: connection details come from the config file
+      // If the config uses ${VAR} interpolation, set those variables here, e.g.:
+      // "env": { "ORDER_PROD_USER": "admin", "ORDER_PROD_PASS": "<password>" }
     }
   }
 }
 ```
 
-**方式二：直接指向构建产物（无需 link）**
-
-如果不想污染全局命令，直接把 `command` 写成 `node` + 指向构建产物的绝对路径：
+If you prefer not to register a global command, point `command` at the built entry file instead:
 
 ```json
 {
   "mcpServers": {
     "xxl-job": {
       "command": "node",
-      "args": ["/绝对路径/multi-xxl-job-mcp/dist/src/server.js"]
-      // 连接信息来自配置文件，无需 env
+      "args": ["/absolute/path/to/multi-xxl-job-mcp/dist/src/server.js"]
+      // Connection details come from the config file; no env needed
     }
   }
 }
 ```
 
-> **提示**：Windows 下路径需使用正斜杠或双反斜杠，例如 `C:/tools/multi-xxl-job-mcp/dist/src/server.js`。
-> **发布流程**：见 [docs/RELEASING.md](docs/RELEASING.md)。采用 npm Trusted Publishing（OIDC），
-> 仓库里不存任何 npm token。
+> **Windows**: use forward slashes or doubled backslashes, e.g. `C:/tools/multi-xxl-job-mcp/dist/src/server.js`.
 
-## 使用示例
+> **Releasing**: see [docs/RELEASING.md](docs/RELEASING.md). Publishing uses npm Trusted Publishing (OIDC); the repository stores no npm token.
 
-配置完成后，你可以用自然语言让 AI 助手操作 XXL-JOB。由于每个工具都需要目标，最好在提问时带上系统和环境：
+## Usage examples
 
-```
-列出所有可用的系统和环境
-```
+Once configured, you can drive XXL-JOB in natural language. Because every tool needs a target, mention the system and environment in your request:
 
 ```
-查询 order 系统 dev 环境有哪些定时任务
+List all available systems and environments
 ```
 
 ```
-对比 order 系统在 dev 和 prod 的任务配置差异
+Show me the scheduled jobs in the order system, dev environment
 ```
 
 ```
-新增一个任务：order 系统 dev 环境，执行器组=demo-server，描述=数据同步，Cron=0 0 2 * * ? *，Handler=syncJobHandler
+Compare the job configuration of the order system between dev and prod
 ```
 
 ```
-停止 order 系统 dev 环境中 id=5 的任务调度
+Create a job: order system, dev environment, executor group=demo-server, description=data sync, Cron=0 0 2 * * ? *, Handler=syncJobHandler
 ```
 
 ```
-查看 order 系统 prod 环境里 id=3 的任务最近 10 条执行日志
+Stop the schedule of job id=5 in the order system, dev environment
 ```
 
 ```
-预演 Cron 表达式 0 0/30 * * * ? 在 prod 环境的未来触发时间
+Show the last 10 execution logs for job id=3 in the order system, prod environment
 ```
 
-## 开发
+```
+Preview the upcoming fire times for Cron 0 0/30 * * * ? in the prod environment
+```
+
+## Development
 
 ```bash
-# 克隆项目
+# clone
 git clone https://github.com/SkylerFee/multi-xxl-job-mcp.git
 cd multi-xxl-job-mcp
 
-# 安装依赖
+# install dependencies
 npm install
 
-# 编译
+# compile
 npm run build
 
-# 代码检查（ESLint，规则见 eslint.config.js；仅本地执行，CI 不跑）
+# lint (ESLint; rules in eslint.config.js — local only, CI does not run lint)
 npm run lint
 
-# 运行
+# run
 npm start
 
-# 开发模式（自动重新编译）
+# watch mode (recompile on change)
 npm run dev
 ```
 
-### 本地调试（Mock + Inspector）
+### Local debugging (Mock + Inspector)
 
-三个脚手架脚本，覆盖「没有真实调度中心」时的全部调试需求。**都要求先 `npm run build`**。
+Three scaffold scripts cover debugging without a real scheduler. **All of them require `npm run build` first.**
 
 ```bash
-# 1. 起一个 Mock XXL-JOB Admin（固定端口 18080，并发一份隔离的调试配置）
+# 1. Start a mock XXL-JOB Admin (fixed port 18080, also writes an isolated debug config)
 npm run dev:mock
-npm run dev:mock -- --port 18081      # 换端口（18080 被占用时）
-npm run dev:mock -- --no-config       # 只起服务，不写配置文件
+npm run dev:mock -- --port 18081      # use another port if 18080 is taken
+npm run dev:mock -- --no-config       # start the mock only, skip the config file
 ```
 
-`dev:mock` 做两件事：
+`dev:mock` does two things:
 
-- 在 `127.0.0.1:18080` 起 Mock Admin（账号 `admin` / `mock-pass`）
-- 往 `tmp/dev-home/.config/multi-xxl-job-mcp/config.yaml` 写一份配置，含 `demo/dev` 与 `demo/prod`
-  **两个环境指向同一个 Mock**——这样能验证「同目标复用、跨目标隔离」这条主线；单环境看不出。
+- Starts a mock Admin on `127.0.0.1:18080` (credentials `admin` / `mock-pass`)
+- Writes a config to `tmp/dev-home/.config/multi-xxl-job-mcp/config.yaml` containing `demo/dev` and `demo/prod`
+  **both pointing at the same mock** — this lets you exercise the core "reuse per target, isolation across targets" behavior, which a single-environment config cannot show.
 
-> 配置文件写在 `tmp/dev-home/`（已被 `.gitignore` 覆盖），**不会碰你真实的 `~/.config`**。
+> The config lives under `tmp/dev-home/` (covered by `.gitignore`) and **never touches your real `~/.config`**.
 
 ```bash
-# 2. 用官方 MCP Inspector 调试（另开一个终端）
-npm run dev:inspect                                        # Web UI，自动开浏览器
-npm run dev:inspect -- --tui                               # 终端交互界面
-npm run dev:inspect -- --cli --method tools/list           # 列出全部工具与 schema
+# 2. Debug with the official MCP Inspector (separate terminal)
+npm run dev:inspect                                        # Web UI, opens a browser
+npm run dev:inspect -- --tui                               # terminal UI
+npm run dev:inspect -- --cli --method tools/list           # list every tool and its schema
 npm run dev:inspect -- --cli --method tools/call --tool-name list_instances
 npm run dev:inspect -- --cli --method tools/call --tool-name list_jobs \
   --tool-arg system=demo --tool-arg env=dev --tool-arg page=1 --tool-arg pageSize=5
 
-# 3. 对 Mock 跑只读联调（等价 test:client，但不用手动设 HOME）
+# 3. Run read-only client checks against the mock (like test:client, without setting HOME)
 npm run dev:client                    # demo/dev
-npm run dev:client -- demo prod       # 指定 system env
+npm run dev:client -- demo prod       # explicit system and env
 ```
 
-`dev:inspect` 会自动把参数摆成 Inspector 要求的顺序，你只写自己的开关即可：
+`dev:inspect` places arguments in the order the Inspector requires; you only supply your own flags:
 
-- **模式 flag**（`--cli` / `--tui` / `--web`）排在最前 —— Inspector 的硬性要求
-- **server 启动命令**排在变长选项之前 —— `--tool-arg` 这类选项会一直吞掉后续 token，
-  server 命令若在其后将报 `Invalid parameter format: /path/to/node`
+- **Mode flags** (`--cli` / `--tui` / `--web`) go first — a hard requirement of the Inspector
+- **The server command** goes before variadic options — options like `--tool-arg` swallow every following token, so a server command placed after them fails with `Invalid parameter format: /path/to/node`
 
-排查参数问题时用 `--print-args` 只打印最终命令、不启动 Inspector：
+To troubleshoot argument handling, `--print-args` prints the final command without starting the Inspector:
 
 ```bash
 npm run dev:inspect -- --print-args --cli --method tools/call --tool-name list_jobs --tool-arg system=demo
 ```
 
-`dev:inspect` 与 `dev:client` 默认读 `tmp/dev-home` 的配置，与 `dev:mock` 保持一致。
-要连真实调度中心时加 `--real-home`，它们就会读你 `~/.config` 里的配置：
+`dev:inspect` and `dev:client` read the `tmp/dev-home` config by default, staying consistent with `dev:mock`. To talk to a real scheduler, add `--real-home` so they read your `~/.config`:
 
 ```bash
 npm run dev:inspect -- --real-home
 npm run dev:client -- --real-home
 ```
 
-**为什么 Inspector 不进 devDependencies**：它是调试便利工具，`npx` 按需拉取即可。
-装进依赖会让 `node_modules` 多出一大坨、拉长 `npm ci`，而它对运行和测试都没有必要。
-脚本里已把 `npm_config_cache` 指到 `tmp/npm-cache`，沙箱下也能正常拉包。
+**Why the Inspector is not a devDependency**: it is a convenience tool, pulled on demand via `npx`. Installing it would bloat `node_modules` and slow `npm ci`, and neither the runtime nor the tests need it. The scripts point `npm_config_cache` at `tmp/npm-cache` so package fetching works in sandboxed environments too.
 
-> **schema 可移植性自检**：`npm run smoke` 会扫描所有工具的 inputSchema，拒绝 `type: ["number","string"]`
-> 这类数组写法。它合法但不可移植——把 tool schema 映射到单一 `type` 方言的客户端（如 Gemini
-> function declarations 用的 OpenAPI 子集）可能拒收整个工具或静默丢约束。需要多类型时用 `anyOf`。
->
-> **断点调试**：`node --inspect-brk dist/src/server.js`，然后 Chrome 打开 `chrome://inspect` attach。
-> 改代码时另开一个终端跑 `npm run dev`（`tsc --watch`）。
-> ⚠️ stdio 模式下 **stdout 是 JSON-RPC 协议通道**，调试输出只能走 `console.error`，否则会污染协议流。
+> **Schema portability check**: `npm run smoke` scans every tool's inputSchema and rejects array-style `type` declarations such as `type: ["number","string"]`. They are legal JSON Schema but not portable — clients that map tool schemas onto a single-`type` dialect (such as the OpenAPI subset used for Gemini function declarations) may reject the whole tool or silently drop the constraint. Use `anyOf` when a field accepts multiple types.
 
-### 测试
+> **Breakpoints**: run `node --inspect-brk dist/src/server.js`, then attach from Chrome via `chrome://inspect`. For iterating, run `npm run dev` (`tsc --watch`) in another terminal.
+> ⚠️ In stdio mode **stdout is the JSON-RPC channel** — debug output must go to `console.error`, or it corrupts the protocol stream.
+
+### Tests
 
 ```bash
-# 一次跑完所有离线测试（自动遍历 package.json 里的 test:* 脚本，跳过需真实 Admin 的 test:client）
+# Run every offline test (iterates all test:* scripts in package.json, skipping test:client)
 npm test
 
-# 也可以单独跑：
-# 冒烟测试（不需要 XXL-JOB，校验工具注册）
+# Or run them individually:
+# smoke test (no XXL-JOB needed; verifies tool registration)
 npm run smoke
 
-# 配置解析层单元测试（纯函数）
+# config parsing unit tests (pure functions)
 npm run test:config
 
-# 目标注册表单元测试（注入假客户端）
+# target registry unit tests (injected fake client)
 npm run test:registry
 
-# init 子命令单元测试
+# init subcommand unit tests
 npm run test:cli
 
-# 本地调试脚手架的测试（固定端口、参数校验）
+# local debugging scaffold tests (fixed port, argument validation)
 npm run test:dev
 
-# 全链路集成测试（两个 Mock 目标，验证目标隔离）
+# end-to-end integration test (two mock targets, verifies isolation)
 npm run test:integration
 
-# 只读联调（需已生成配置文件 + 可达的真实调度中心）
-npm run test:client                                  # 默认 order/dev
-node dist/tests/test-client.js payment prod           # 指定系统与环境
+# read-only run against a real scheduler (needs a config file and reachable Admin)
+npm run test:client                                  # defaults to order/dev
+node dist/tests/test-client.js payment prod           # explicit system and environment
 ```
 
-## 项目结构
+## Project layout
 
 ```
 multi-xxl-job-mcp/
 ├── src/
-│   ├── server.ts      # MCP 服务入口，注册所有工具
-│   ├── registry.ts    # 目标注册表：(system, env) -> 带登录态的客户端
-│   ├── cli.ts         # init 子命令
-│   ├── client.ts      # XXL-JOB Admin HTTP 客户端
-│   ├── config.ts      # 配置文件解析、插值、校验、平台路径
-│   └── models.ts      # 数据结构与校验逻辑
+│   ├── server.ts      # MCP server entry; registers all tools
+│   ├── registry.ts    # target registry: (system, env) -> client with login state
+│   ├── cli.ts         # init subcommand
+│   ├── client.ts      # XXL-JOB Admin HTTP client
+│   ├── config.ts      # config parsing, interpolation, validation, platform paths
+│   └── models.ts      # data structures and validation logic
 ├── tests/
-│   ├── config.test.ts    # 配置解析层单元测试
-│   ├── registry.test.ts  # 目标注册表单元测试
-│   ├── cli.test.ts       # init 子命令单元测试
-│   ├── smoke.ts          # 冒烟测试（工具注册 + 双参数校验）
-│   ├── integration.ts    # 集成测试（两个 Mock 目标）
-│   ├── test-client.ts    # 真实环境只读联调
-│   ├── regression.test.ts   # 已修复脆弱点的回归测试
-│   ├── dev-scaffold.test.ts # 本地调试脚手架的测试
-│   └── mock-admin.ts     # Mock 服务器
+│   ├── config.test.ts       # config parsing unit tests
+│   ├── registry.test.ts     # target registry unit tests
+│   ├── cli.test.ts          # init subcommand unit tests
+│   ├── smoke.ts             # smoke test (tool registration + dual-argument checks)
+│   ├── integration.ts       # integration test (two mock targets)
+│   ├── test-client.ts       # read-only checks against a real scheduler
+│   ├── regression.test.ts   # regression tests for fixed fragility points
+│   ├── dev-scaffold.test.ts # local debugging scaffold tests
+│   └── mock-admin.ts        # mock Admin server
 ├── docs/
-│   ├── ARCHITECTURE.md   # 架构与功能逻辑
-│   ├── specs/            # 技术方案
-│   └── adr/              # 架构决策记录
+│   ├── ARCHITECTURE.md   # architecture and behavior (Chinese)
+│   ├── RELEASING.md      # release process (Chinese)
+│   ├── specs/            # design documents
+│   └── adr/              # architecture decision records
 ├── scripts/
-│   ├── test-all.mjs      # 串行跑尽 package.json 里所有 test:* 脚本
-│   ├── dev-mock.mjs      # 本地调试：起 Mock Admin + 写隔离配置
-│   ├── dev-inspect.mjs   # 本地调试：官方 MCP Inspector 的便捷入口
-│   └── dev-client.mjs    # 本地调试：对 Mock 跑只读联调
+│   ├── test-all.mjs      # run every test:* script sequentially
+│   ├── release-policy.mjs # release identity and artifact validation
+│   ├── dev-mock.mjs      # local debugging: start mock Admin + write isolated config
+│   ├── dev-inspect.mjs   # local debugging: convenience wrapper for MCP Inspector
+│   └── dev-client.mjs    # local debugging: read-only checks against the mock
 ├── eslint.config.js      # ESLint flat config
-├── config.example.yaml   # 配置文件示例
+├── config.example.yaml   # example config
 ├── package.json
 └── tsconfig.json
 ```
 
-## 技术栈
+## Tech stack
 
-- **Runtime**: Node.js >= 26（见 `.node-version`）
+- **Runtime**: Node.js >= 26 (see `.node-version`)
 - **Language**: TypeScript
 - **MCP SDK**: @modelcontextprotocol/sdk
-- **Schema Validation**: Zod
+- **Schema validation**: Zod
 - **Transport**: stdio
 
-## 许可证
+## License
 
 [MIT](./LICENSE) © 2026
+
+---
+
+[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
