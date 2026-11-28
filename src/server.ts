@@ -8,14 +8,14 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
 
 import { XxlJobClient, XxlJobApiError } from "./client.js";
 import { HELP_TEXT, runAdd, runInit } from "./cli.js";
-import { loadConfigFromDefaultPath } from "./config.js";
+import { loadConfigFile, loadConfigFromDefaultPath } from "./config.js";
 import { TargetError, TargetRegistry } from "./registry.js";
 import {
   JOB_DEFAULTS,
@@ -58,9 +58,35 @@ type ToolResult = {
   isError?: boolean;
 };
 
+/**
+ * 本次工具调用需要附加到结果前的提示（配置热加载等）。
+ *
+ * 用模块级变量而非逐层传参：ok/fail 被 26 处调用，加一个参数意味着 26 处都要改，
+ * 而每处漏改的表现是「有时有提示、有时没有」，比没有提示更让人困惑。
+ * 单个 MCP 进程内工具调用是串行的，用变量传递是安全的。
+ */
+let pendingNotice: string | null = null;
+
+/**
+ * 取出并清空本次待附加的提示。
+ *
+ * 必须取出即清空：否则一次重载的提示会粘在后续所有调用上。
+ */
+function takePendingNotice(): string | null {
+  const notice = pendingNotice;
+  pendingNotice = null;
+  return notice;
+}
+
+/** 把提示文本并入结果的首行，保持返回结构不变 */
+function withNotice(text: string): string {
+  const notice = takePendingNotice();
+  return notice === null ? text : "[" + notice + "]\n" + text;
+}
+
 function ok(data: unknown, note?: string): ToolResult {
   const text = note ? `${note}\n${JSON.stringify(data, null, 2)}` : JSON.stringify(data, null, 2);
-  return { content: [{ type: "text", text }] };
+  return { content: [{ type: "text", text: withNotice(text) }] };
 }
 
 /**
@@ -90,10 +116,10 @@ function handleResultText(handleCode: number): string {
  */
 function fail(e: unknown): ToolResult {
   if (e instanceof TargetError) {
-    return { content: [{ type: "text", text: `目标参数错误: ${e.message}` }], isError: true };
+    return { content: [{ type: "text", text: withNotice(`目标参数错误: ${e.message}`) }], isError: true };
   }
   const msg = e instanceof XxlJobApiError ? e.message : e instanceof Error ? e.message : String(e);
-  return { content: [{ type: "text", text: `调用 XXL-JOB 失败: ${msg}` }], isError: true };
+  return { content: [{ type: "text", text: withNotice(`调用 XXL-JOB 失败: ${msg}`) }], isError: true };
 }
 
 /**
@@ -137,8 +163,102 @@ function jobToForm(job: XxlJobInfo): Record<string, string | number> {
  *
  * @param registry 目标注册表，(system, env) -> 已登录的客户端
  */
-export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
+/**
+ * buildServer 的可选项，全部有默认值。
+ */
+export interface BuildServerOptions {
+  /**
+   * 配置文件的绝对路径。
+   *
+   * **不传时关闭热加载**：不知道从哪读，就无法重新读取。
+   * 传了之后每个工具调用前会检查该文件的 mtime，变了就重载。
+   */
+  configPath?: string;
+}
+
+/**
+ * 配置文件的修改时间与大小，用于判断是否需要重载。
+ *
+ * 用 mtime+size 而非单纯 mtime：同一秒内改写并保持长度不变的窗口极小，
+ * 加上 size 能覆盖「内容换了但长度巧合相同」之外的情况，成本几乎为零。
+ *
+ * @param path 配置文件路径
+ * @returns 指纹字符串；文件不可读时返回 null（触发一次重载尝试并暴露真实错误）
+ */
+function statFingerprint(path: string): string | null {
+  try {
+    const st = statSync(path);
+    return st.mtimeMs + ":" + st.size;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 建一个「按需重载配置」的闭包。
+ *
+ * 为什么不监听 fs.watch：
+ * - 各平台事件语义不一致（rename / change 混发、编辑器原子替换会丢事件）
+ * - 事件可能在文件写一半时到达，读到不完整内容
+ *
+ * 改为在每次工具调用前比对指纹：只在真正被用到时读一次 stat，
+ * 开销可忽略；且此时文件早已写完，不会读到中间态。
+ *
+ * 重载失败（配置写错、权限问题）时**保留旧配置并回传错误**，
+ * 而不是让服务崩掉——配置写错不该导致 MCP 连接断开。
+ *
+ * @param registry 目标注册表
+ * @param configPath 配置文件绝对路径
+ * @param logger 日志输出
+ * @returns ensureFresh：必要时重载，返回一条提示（无变更时为 null）
+ */
+function makeConfigReloader(
+  registry: TargetRegistry<XxlJobClient>,
+  configPath: string,
+  logger: (message: string) => void,
+): () => string | null {
+  let fingerprint = statFingerprint(configPath);
+  return () => {
+    const current = statFingerprint(configPath);
+    if (current === fingerprint) return null;
+    fingerprint = current;
+    // 先清一次：即使下面读配置抛错，也不能让上次的提示残留
+    pendingNotice = null;
+
+    try {
+      const next = loadConfigFile(configPath);
+      const result = registry.reload(next);
+      const notice = "配置已自动重载（" + result.systems + " 个系统，" +
+        "丢弃 " + result.droppedClients + " 个已缓存客户端，下次使用将重新登录）";
+      logger(notice);
+      return notice;
+    } catch (e) {
+      // 保留旧配置：配置写错时继续用旧的，比让整个服务不可用要好
+      const message = errorText(e);
+      const notice = "配置重载失败，继续使用旧配置: " + message;
+      logger(notice);
+      return notice;
+    }
+  };
+}
+
+/**
+ * 把任意抛出物转成一行可读文本（本地简写，避免多处 instanceof 判断）。
+ *
+ * @param e 任意抛出物
+ */
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+export function buildServer(registry: TargetRegistry<XxlJobClient>, options: BuildServerOptions = {}): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+
+  // 热加载：每个工具调用前检查配置文件是否变化。
+  // 不传 configPath 时 ensureFresh 恒返回 null，行为与不支持热加载时完全一致。
+  const ensureFresh: () => string | null = options.configPath === undefined
+    ? () => null
+    : makeConfigReloader(registry, options.configPath, (m) => console.error("[" + SERVER_NAME + "] " + m));
 
   // ----------------------------------------------------------------
   // 目标发现
@@ -153,6 +273,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       inputSchema: {},
     },
     async () => {
+      pendingNotice = ensureFresh();
       try {
         // 只输出「调用方寻址所必需」的字段：
         //   system / env —— 后续所有工具的入参
@@ -199,6 +320,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, page, pageSize, appname, title }) => {
+      pendingNotice = ensureFresh();
       try {
         const result = await registry.get(system, env).listJobGroups(page, pageSize, appname, title);
         return ok({ recordsTotal: pageTotal(result), groups: result.data });
@@ -229,6 +351,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, page, pageSize, jobGroup, triggerStatus, jobDesc, executorHandler, author }) => {
+      pendingNotice = ensureFresh();
       try {
         const result = await registry.get(system, env).listJobs(page, pageSize, {
           jobGroup,
@@ -256,6 +379,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, jobId }) => {
+      pendingNotice = ensureFresh();
       try {
         const job = await registry.get(system, env).getJobById(jobId);
         return ok({ ...job, triggerStatusText: triggerStatusText(job.triggerStatus) });
@@ -301,6 +425,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async (args) => {
+      pendingNotice = ensureFresh();
       try {
         const scheduleError = validateSchedule(args.scheduleType, args.scheduleConf);
         if (scheduleError) return fail(new Error(scheduleError));
@@ -358,6 +483,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async (args) => {
+      pendingNotice = ensureFresh();
       try {
         const target = registry.get(args.system, args.env);
         const existing = await target.getJobById(args.jobId);
@@ -398,6 +524,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       inputSchema: { ...targetSchema, jobId: z.number().int().describe("任务 id") },
     },
     async ({ system, env, jobId }) => {
+      pendingNotice = ensureFresh();
       try {
         await registry.get(system, env).startJob(jobId);
         return ok({ jobId, triggerStatus: 1 }, `任务 id=${jobId} 已启动调度`);
@@ -415,6 +542,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       inputSchema: { ...targetSchema, jobId: z.number().int().describe("任务 id") },
     },
     async ({ system, env, jobId }) => {
+      pendingNotice = ensureFresh();
       try {
         await registry.get(system, env).stopJob(jobId);
         return ok({ jobId, triggerStatus: 0 }, `任务 id=${jobId} 已停止调度`);
@@ -434,6 +562,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       inputSchema: { ...targetSchema, jobId: z.number().int().describe("任务 id") },
     },
     async ({ system, env, jobId }) => {
+      pendingNotice = ensureFresh();
       try {
         await registry.get(system, env).removeJob(jobId);
         return ok({ jobId }, `任务 id=${jobId} 已删除`);
@@ -457,6 +586,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, jobId, executorParam, addressList }) => {
+      pendingNotice = ensureFresh();
       try {
         await registry.get(system, env).triggerJob(jobId, executorParam, addressList);
         return ok({ jobId }, `任务 id=${jobId} 已触发一次执行，可用 list_job_logs 查看执行结果`);
@@ -478,6 +608,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, scheduleType, scheduleConf }) => {
+      pendingNotice = ensureFresh();
       try {
         const times = await registry.get(system, env).nextTriggerTimes(scheduleType, scheduleConf);
         return ok({ scheduleType, scheduleConf, nextTriggerTimes: times });
@@ -509,6 +640,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, page, pageSize, jobGroup, jobId, logStatus, filterTimeStart, filterTimeEnd }) => {
+      pendingNotice = ensureFresh();
       try {
         const result = await registry.get(system, env).listJobLogs(page, pageSize, {
           jobGroup,
@@ -553,6 +685,7 @@ export function buildServer(registry: TargetRegistry<XxlJobClient>): McpServer {
       },
     },
     async ({ system, env, logId, executorAddress, triggerTime, fromLineNum }) => {
+      pendingNotice = ensureFresh();
       try {
         const detail = await registry.get(system, env).logDetailCat(logId, executorAddress, triggerTime, fromLineNum);
         return ok(detail);
@@ -577,11 +710,13 @@ export async function main(): Promise<void> {
   // 打印实际读取的路径，消除"到底读了哪个文件"的疑问
   console.error(`[${SERVER_NAME}] 配置文件: ${path}`);
   const registry = new TargetRegistry(config);
-  const server = buildServer(registry);
+  // 传入配置路径以启用热加载：改完配置不必重启 MCP 客户端，
+  // 下一次工具调用就会读到新内容
+  const server = buildServer(registry, { configPath: path });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stdio 服务通过标准输入/输出通信，日志只能走 stderr
-  console.error(`[${SERVER_NAME}] 已启动，已加载 ${Object.keys(config.systems).length} 个系统`);
+  console.error(`[${SERVER_NAME}] 已启动，已加载 ${Object.keys(config.systems).length} 个系统（配置变更将自动重载）`);
 }
 
 /**

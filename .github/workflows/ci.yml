@@ -68,6 +68,9 @@ jobs:
       - name: Local debugging scaffold tests
         run: npm run test:dev
 
+      - name: Hot reload tests (配置热加载)
+        run: npm run test:hot-reload
+
       - name: Regression tests (已修复脆弱点)
         run: npm run test:regression
 
