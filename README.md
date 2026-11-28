@@ -127,6 +127,30 @@ Using one path instead of three platform-specific ones is deliberate: macOS `App
 
 The server prints the absolute path it actually loaded on startup. See [config.example.yaml](./config.example.yaml) for a full example.
 
+### Config hot reload
+
+**No need to restart your MCP client after editing the config.** Before every tool call the
+server compares the config file's mtime and size; if it changed, the config is reloaded and the
+next call sees it.
+
+```
+[配置已自动重载（2 个系统，丢弃 0 个已缓存客户端，下次使用将重新登录）]
+{ ... fresh list_instances result ... }
+```
+
+Behavior details:
+
+| Situation | What happens |
+|---|---|
+| Config unchanged | No file read, just one `stat` — negligible cost |
+| Changed and valid | Reloaded; the result starts with a reload notice |
+| Changed but invalid | **Keeps the old config**, reports the error in the result; the server keeps running |
+| First use of a target after reload | Logs in again (clients are rebuilt against the new config) |
+
+> **Why reload rebuilds clients**: a client bakes the url / username / password into itself at
+> construction. Swapping only the config object would keep using the old credentials against the
+> old host — "thought it changed, actually didn't" is the worst failure mode. One extra login is
+> a fair trade.
 ### Config file format
 
 YAML by default; JSON is accepted by the same parser. Minimal example:

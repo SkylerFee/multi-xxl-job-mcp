@@ -105,8 +105,8 @@ export class TargetRegistry<TClient = XxlJobClient> {
   /** 已创建的客户端，键为 "system/env"（合法键名不含 "/"，因此不会歧义） */
   private readonly clients = new Map<string, TClient>();
 
-  /** 整份配置，构造后不再变化 */
-  private readonly config: ConfigFile;
+  /** 整份配置；可通过 reload() 整体替换（热加载） */
+  private config: ConfigFile;
 
   /** 客户端工厂 */
   private readonly createClient: ClientFactory<TClient>;
@@ -159,6 +159,33 @@ export class TargetRegistry<TClient = XxlJobClient> {
     // 而「用户名 + 弱口令」就足以撞开调度中心，没必要给它这项便利。
     this.logger("创建客户端: " + key + " -> " + redactUrlCredentials(envConfig.url));
     return client;
+  }
+
+  /**
+   * 用新配置整体替换当前配置，并清掉已缓存客户端，让它们按新配置重建。
+   *
+   * **为什么必须清缓存**：客户端在构造时就把 url / username / password 固化进了自己，
+   * 只换配置对象而不清客户端，会继续用旧凭据连旧地址——那是最糟的失败模式：
+   * 用户以为改生效了，实际还在操作原来的环境。
+   *
+   * 代价是所有目标下次使用时要重新登录一次。这可以接受：配置变更本身就是低频操作，
+   * 而重新登录比「改了没生效」安全得多。
+   *
+   * 清空后不预建任何客户端，保持原有的懒创建语义。
+   *
+   * @param next 已通过 buildConfig / loadConfigFile 校验的新配置
+   * @returns 被丢弃的客户端数量，供调用方提示
+   */
+  reload(next: ConfigFile): { systems: number; droppedClients: number } {
+    const droppedClients = this.clients.size;
+    this.clients.clear();
+    this.config = next;
+    const names = Object.keys(next.systems);
+    this.logger(
+      "配置已重载: " + names.length + " 个系统 (" + names.join(", ") + ")，" +
+        "丢弃 " + droppedClients + " 个已缓存客户端",
+    );
+    return { systems: names.length, droppedClients };
   }
 
   /**
